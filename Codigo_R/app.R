@@ -1,4 +1,3 @@
-# Dashboard creado con Claude
 # ============================================================
 #  CATALOGO SISMICO RSPR - PANEL DE EXPLORACION Y AUDITORIA
 #  Red Sismica de Puerto Rico (UPR-Mayaguez)
