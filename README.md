@@ -1,2 +1,0 @@
-# SPDEs_and_applications
-Estudios independientes
