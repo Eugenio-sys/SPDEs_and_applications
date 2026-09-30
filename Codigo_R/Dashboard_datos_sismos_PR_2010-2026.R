@@ -5,6 +5,7 @@
 #  USO:  coloque este archivo en una carpeta junto a los .json
 #        (o ponga los .json en una subcarpeta "datos/") y ejecute
 #        shiny::runApp()
+#HOLA
 # ============================================================
 
 # ---- 0. PAQUETES ------------------------------------------
