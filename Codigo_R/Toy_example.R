@@ -19,7 +19,7 @@ library(splancs)
 library(brinla)
 library(httr)
 
-hola
+# Jelou uorld
 
 # 1. LECTURA DE DATOS JSON 
 DATA_DIR <- if (dir.exists("datos")) "datos" else "."
