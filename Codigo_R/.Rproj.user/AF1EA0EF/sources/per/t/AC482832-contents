@@ -1,0 +1,1244 @@
+library(shiny)
+
+ui <- withMathJax(fluidPage(
+  tags$head(
+    tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
+    tags$style(HTML('
+      * { box-sizing: border-box; }
+      html { margin:0; min-height:100%; overflow-y:scroll; scrollbar-gutter:stable; }
+      body { margin:0; min-height:100%; }
+      body {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color:#0f172a;
+        background:radial-gradient(circle at top,#f8fafc 0%,#e2e8f0 58%,#dbe4ef 100%);
+      }
+      button, select, input { font:inherit; }
+      .app-shell { max-width:1280px; margin:0 auto; padding:18px; }
+      .hero-card,.board-card,.math-card,.stat-card {
+        background:rgba(255,255,255,.80);
+        backdrop-filter:blur(10px);
+        border:1px solid rgba(255,255,255,.78);
+        box-shadow:0 18px 45px rgba(15,23,42,.10);
+      }
+      .hero-card,.board-card,.math-card { border-radius:30px; }
+      .hero-card { padding:28px; }
+      .board-card,.math-card { padding:22px; }
+      .badge {
+        display:inline-flex; align-items:center; gap:8px; padding:7px 12px;
+        border-radius:999px; border:1px solid #e2e8f0; background:#fff;
+        color:#64748b; font-size:11px; font-weight:800; letter-spacing:.16em;
+        text-transform:uppercase;
+      }
+      .hero-title {
+        margin:14px 0 0; max-width:940px; font-size:clamp(2rem,4.2vw,3.45rem);
+        line-height:1.02; font-weight:900; letter-spacing:-.045em; color:#020617;
+      }
+      .hero-subtitle { margin:14px 0 0; max-width:920px; color:#475569; font-size:16px; line-height:1.72; }
+      .stats-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:22px; }
+      .stat-card { border-radius:24px; padding:16px; background:rgba(255,255,255,.92); border:1px solid #e2e8f0; box-shadow:0 4px 16px rgba(15,23,42,.05); }
+      .stat-label { color:#64748b; font-size:13px; font-weight:800; margin-bottom:8px; }
+      .stat-value { font-size:30px; font-weight:900; letter-spacing:-.035em; }
+      .stat-subvalue { margin-top:6px; color:#64748b; font-size:12px; min-height:18px; }
+      .play-grid { display:grid; grid-template-columns:minmax(0,1fr) 390px; gap:18px; align-items:start; margin-top:16px; }
+      .board-card { min-width:0; }
+      .math-card { width:390px; min-width:390px; max-width:390px; min-height:760px; contain:layout paint; overflow:hidden; }
+      .section-head { display:flex; align-items:flex-start; gap:12px; margin-bottom:16px; }
+      .section-icon { width:42px; height:42px; border-radius:16px; display:flex; align-items:center; justify-content:center; background:#0f172a; color:#fff; box-shadow:0 8px 18px rgba(15,23,42,.18); font-size:18px; flex:0 0 auto; }
+      .section-title { margin:0; font-size:25px; font-weight:900; letter-spacing:-.03em; }
+      .section-subtitle { margin:5px 0 0; color:#64748b; font-size:14px; line-height:1.65; }
+      .controls-grid { display:grid; grid-template-columns:minmax(170px,1fr) minmax(170px,1fr) auto; gap:12px; align-items:stretch; margin-bottom:14px; }
+      .control-box { border-radius:20px; border:1px solid #e2e8f0; background:rgba(255,255,255,.92); padding:12px 14px; }
+      .control-label { display:block; font-size:13px; font-weight:800; color:#334155; margin-bottom:7px; }
+      .range-row { display:flex; align-items:center; gap:10px; }
+      .range-row input[type=range] { width:100%; accent-color:#7c3aed; }
+      .range-value { min-width:42px; text-align:right; font-weight:900; font-size:14px; }
+      .control-button {
+        border:1px solid #e2e8f0; background:#fff; border-radius:18px; padding:13px 16px;
+        font-size:14px; font-weight:850; color:#334155; cursor:pointer;
+        box-shadow:0 4px 12px rgba(15,23,42,.05);
+        transition:transform 120ms ease,box-shadow 120ms ease,background 120ms ease;
+      }
+      .control-button:hover { transform:translateY(-1px); box-shadow:0 10px 20px rgba(15,23,42,.09); background:#f8fafc; }
+      .control-button.primary { background:#0f172a; color:#fff; border-color:#0f172a; }
+      .control-button.primary:hover { background:#1e293b; }
+      .control-button.accent { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+      .control-button.accent:hover { background:#6d28d9; }
+      .control-button:disabled { opacity:.46; cursor:not-allowed; transform:none; box-shadow:none; }
+      .button-row { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+      .board-wrap {
+        position:relative; width:100%; aspect-ratio:1.42/1; min-height:430px; overflow:hidden;
+        border-radius:28px; border:1px solid #cbd5e1;
+        background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);
+        touch-action:none; user-select:none;
+      }
+      #fourier-canvas { position:absolute; inset:0; z-index:2; width:100%; height:100%; display:block; touch-action:none; cursor:crosshair; pointer-events:auto; }
+      .board-tip { position:absolute; right:14px; top:14px; z-index:4; pointer-events:none; padding:7px 10px; border-radius:999px; background:rgba(255,255,255,.88); border:1px solid rgba(203,213,225,.88); color:#64748b; font-size:11px; font-weight:800; backdrop-filter:blur(6px); }
+      .legend-row { display:flex; flex-wrap:wrap; gap:9px; margin-top:12px; font-size:12px; color:#64748b; }
+      .legend-chip { display:inline-flex; align-items:center; gap:7px; border:1px solid #e2e8f0; border-radius:999px; background:#fff; padding:6px 9px; }
+      .legend-dot { width:10px; height:10px; border-radius:999px; }
+      .math-stack { display:grid; gap:12px; min-width:0; }
+      .math-box { border-radius:22px; border:1px solid #e2e8f0; background:rgba(255,255,255,.93); padding:15px; min-width:0; overflow:hidden; }
+      .math-kicker { color:#7c3aed; text-transform:uppercase; letter-spacing:.14em; font-size:10px; font-weight:900; margin-bottom:8px; }
+      .math-formula { font-size:20px; line-height:1.5; color:#111827; overflow:hidden; }
+      .math-formula mjx-container { margin:.2em 0 !important; max-width:100%; overflow:hidden; }
+      .math-small mjx-container { margin:.15em 0 !important; max-width:100%; overflow:hidden; }
+      .math-small { margin-top:8px; color:#64748b; font-size:12px; line-height:1.6; }
+      .spectrum { margin-top:10px; height:176px; display:flex; align-items:flex-end; gap:3px; padding:10px 6px 4px; border-top:1px solid #eef2f7; overflow:hidden; }
+      .spectrum-bar { flex:1 1 0; min-width:2px; border-radius:5px 5px 2px 2px; background:#a78bfa; opacity:.82; position:relative; }
+      .spectrum-bar.active { background:#0f172a; opacity:1; }
+      .frequency-strip { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; }
+      .freq-chip { border:1px solid #e2e8f0; background:#fff; color:#475569; border-radius:999px; padding:5px 8px; font-size:11px; font-weight:800; }
+
+      .toggle-inline { display:inline-flex; align-items:center; gap:8px; border:1px solid #e2e8f0; border-radius:999px; background:#fff; padding:9px 12px; color:#475569; font-size:12px; font-weight:800; box-shadow:0 4px 12px rgba(15,23,42,.05); user-select:none; }
+      .toggle-inline input { accent-color:#7c3aed; }
+      .mini-strip { display:flex; align-items:center; gap:10px; margin-top:14px; flex-wrap:wrap; min-height:0; }
+      .mini-clock { width:84px; border:1px solid #e2e8f0; background:#fff; border-radius:18px; padding:7px; box-shadow:0 4px 12px rgba(15,23,42,.05); }
+      .mini-clock canvas { width:68px; height:68px; display:block; margin:0 auto; }
+      .mini-clock-label { margin-top:4px; text-align:center; color:#475569; font-size:11px; font-weight:850; }
+      .mini-ellipsis { width:34px; text-align:center; color:#94a3b8; font-size:28px; font-weight:900; }
+      .tables-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+      .table-card { min-width:0; border:1px solid #e2e8f0; border-radius:20px; background:#fff; padding:12px; box-shadow:0 4px 12px rgba(15,23,42,.05); }
+      .table-title { margin:0 0 8px; color:#0f172a; font-size:14px; font-weight:900; }
+      .table-note { margin:-3px 0 8px; color:#64748b; font-size:11px; line-height:1.45; }
+      .table-wrap { max-height:280px; overflow:auto; border:1px solid #eef2f7; border-radius:14px; }
+      .data-grid { width:100%; border-collapse:collapse; font-size:12px; }
+      .data-grid th,.data-grid td { padding:7px 8px; border-bottom:1px solid #eef2f7; white-space:nowrap; }
+      .data-grid th { position:sticky; top:0; z-index:1; background:#f8fafc; color:#334155; text-align:left; font-weight:900; cursor:pointer; }
+      .data-grid th.sort-asc::after { content:" ▲"; color:#7c3aed; }
+      .data-grid th.sort-desc::after { content:" ▼"; color:#7c3aed; }
+      .data-grid td.num { text-align:right; font-variant-numeric:tabular-nums; }
+      .data-grid tbody tr:nth-child(odd) { background:rgba(248,250,252,.65); }
+      .data-grid tbody tr.active-coeff { background:rgba(124,58,237,.08); }
+      @media (max-width:1060px) {
+        .play-grid { grid-template-columns:1fr; }
+        .math-card { width:100%; min-width:0; max-width:none; min-height:0; contain:none; }
+      }
+      @media (max-width:760px) {
+        .app-shell { padding:12px; }
+        .hero-card,.board-card,.math-card { padding:18px; border-radius:24px; }
+        .stats-grid { grid-template-columns:1fr; }
+        .controls-grid { grid-template-columns:1fr; }
+        .board-wrap { min-height:340px; }
+        .tables-grid { grid-template-columns:1fr; }
+      }
+    ')),
+    tags$script(HTML('
+      (function () {
+        function initFourierApp() {
+          const app = document.getElementById("fourier-app");
+          if (!app || app.dataset.ready === "1") return;
+          app.dataset.ready = "1";
+
+          const canvas = document.getElementById("fourier-canvas");
+          const ctx = canvas.getContext("2d");
+          const els = {
+            reset: document.getElementById("reset-curve"),
+            reveal: document.getElementById("reveal-epicycles"),
+            play: document.getElementById("play-pause"),
+            traceToggle: document.getElementById("toggle-trace"),
+            snapToggle: document.getElementById("snap-grid"),
+            pointsRange: document.getElementById("points-range"),
+            pointsValue: document.getElementById("points-value"),
+            speedRange: document.getElementById("speed-range"),
+            speedValue: document.getElementById("speed-value"),
+            statPoints: document.getElementById("stat-points"),
+            statFreq: document.getElementById("stat-freq"),
+            statFreqSub: document.getElementById("stat-freq-sub"),
+            statState: document.getElementById("stat-state"),
+            statStateSub: document.getElementById("stat-state-sub"),
+            coeffInfo: document.getElementById("coeff-info"),
+            spectrum: document.getElementById("spectrum"),
+            freqStrip: document.getElementById("frequency-strip"),
+            pointsTableWrap: document.getElementById("points-table-wrap"),
+            coeffTableWrap: document.getElementById("coeff-table-wrap"),
+            miniStrip: document.getElementById("mini-epicycles")
+          };
+
+          const state = {
+            width: 0,
+            height: 0,
+            dpr: 1,
+            drawing: false,
+            invalid: false,
+            closed: false,
+            mode: "draw",
+            raw: [],
+            userPointCount: 0,
+            samples: [],
+            coeffs: [],
+            order: [],
+            activeOrder: [],
+            dc: { re: 0, im: 0 },
+            curveCenter: { x: 0, y: 0 },
+            traceSegments: [],
+            t: 0,
+            playing: false,
+            showEpicycles: false,
+            showTrace: true,
+            lastFrame: 0,
+            raf: null,
+            totalLength: 0,
+            pointerId: null,
+            pointerLast: null,
+            sampleCarry: 0,
+            sampleSpacing: 4,
+            gridStep: 40,
+            sortPoints: { key: "n", dir: "asc" },
+            sortCoeffs: { key: "rank", dir: "asc" },
+            reducedMotion: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          };
+
+          function typesetMath(target) {
+            if (!target || !window.MathJax) return;
+            if (window.MathJax.typesetPromise) {
+              if (window.MathJax.typesetClear) window.MathJax.typesetClear([target]);
+              window.MathJax.typesetPromise([target]).catch(function () {});
+              return;
+            }
+            if (window.MathJax.Hub && window.MathJax.Hub.Queue) {
+              window.MathJax.Hub.Queue(["Typeset", window.MathJax.Hub, target]);
+            }
+          }
+
+          function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+          function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+          function complex(re, im) { return { re: re, im: im }; }
+          function cadd(a, b) { return { re: a.re + b.re, im: a.im + b.im }; }
+          function cmul(a, b) { return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }
+          function cexp(theta) { return { re: Math.cos(theta), im: Math.sin(theta) }; }
+          function cabs(z) { return Math.hypot(z.re, z.im); }
+          const BS = String.fromCharCode(92);
+          function tex(s) { return BS + "(" + s + BS + ")"; }
+
+          function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const w = Math.max(320, Math.round(rect.width));
+            const h = Math.max(300, Math.round(rect.height));
+            if (state.width === w && state.height === h && state.dpr === dpr) return;
+            state.width = w;
+            state.height = h;
+            state.dpr = dpr;
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            render();
+          }
+
+          function rawEventPoint(e) {
+            const r = canvas.getBoundingClientRect();
+            return {
+              x: clamp(e.clientX - r.left, 8, r.width - 8),
+              y: clamp(e.clientY - r.top, 8, r.height - 8)
+            };
+          }
+
+          function snapScreenPoint(p) {
+            const ox = state.width / 2;
+            const oy = state.height / 2;
+            const gx = Math.round((p.x - ox) / state.gridStep);
+            const gy = Math.round((oy - p.y) / state.gridStep);
+            return {
+              x: clamp(ox + gx * state.gridStep, 8, state.width - 8),
+              y: clamp(oy - gy * state.gridStep, 8, state.height - 8)
+            };
+          }
+
+          function eventPoint(e) {
+            const p = rawEventPoint(e);
+            return (els.snapToggle && els.snapToggle.checked) ? snapScreenPoint(p) : p;
+          }
+
+          function toMathPoint(p) {
+            return {
+              x: (p.x - state.width / 2) / state.gridStep,
+              y: (state.height / 2 - p.y) / state.gridStep
+            };
+          }
+
+          function toScreenPoint(z) {
+            return {
+              x: state.width / 2 + z.re * state.gridStep,
+              y: state.height / 2 - z.im * state.gridStep
+            };
+          }
+
+          function fmtNum(x, d) {
+            return Number(x).toFixed(d == null ? 3 : d);
+          }
+
+          function gcdInt(a, b) {
+            a = Math.abs(Math.round(a));
+            b = Math.abs(Math.round(b));
+            while (b !== 0) { const t = b; b = a % b; a = t; }
+            return a;
+          }
+
+          function orient(a, b, c) {
+            return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+          }
+
+          function onSegment(a, b, p) {
+            const eps = 1e-7;
+            return p.x >= Math.min(a.x, b.x) - eps && p.x <= Math.max(a.x, b.x) + eps &&
+                   p.y >= Math.min(a.y, b.y) - eps && p.y <= Math.max(a.y, b.y) + eps;
+          }
+
+          function segmentsIntersect(a, b, c, d) {
+            const eps = 1e-7;
+            const o1 = orient(a, b, c);
+            const o2 = orient(a, b, d);
+            const o3 = orient(c, d, a);
+            const o4 = orient(c, d, b);
+            if (((o1 > eps && o2 < -eps) || (o1 < -eps && o2 > eps)) &&
+                ((o3 > eps && o4 < -eps) || (o3 < -eps && o4 > eps))) return true;
+            if (Math.abs(o1) <= eps && onSegment(a, b, c)) return true;
+            if (Math.abs(o2) <= eps && onSegment(a, b, d)) return true;
+            if (Math.abs(o3) <= eps && onSegment(c, d, a)) return true;
+            if (Math.abs(o4) <= eps && onSegment(c, d, b)) return true;
+            return false;
+          }
+
+          function newSegmentWouldIntersect(nextPoint, closing) {
+            if (state.raw.length < 4) return false;
+            const a = state.raw[state.raw.length - 1];
+            const b = nextPoint;
+            const lastSegIndex = state.raw.length - 2;
+            for (let i = 0; i < state.raw.length - 2; i += 1) {
+              if (i === lastSegIndex) continue;
+              if (closing && i === 0) continue;
+              const c = state.raw[i];
+              const d = state.raw[i + 1];
+              if (segmentsIntersect(a, b, c, d)) return true;
+            }
+            return false;
+          }
+
+          function closingSegmentIntersects() {
+            if (state.raw.length < 5) return false;
+            const a = state.raw[state.raw.length - 1];
+            const b = state.raw[0];
+            for (let i = 1; i < state.raw.length - 2; i += 1) {
+              const c = state.raw[i];
+              const d = state.raw[i + 1];
+              if (segmentsIntersect(a, b, c, d)) return true;
+            }
+            return false;
+          }
+
+          function polygonArea(points) {
+            let s = 0;
+            for (let i = 0; i < points.length; i += 1) {
+              const a = points[i];
+              const b = points[(i + 1) % points.length];
+              s += a.x * b.y - a.y * b.x;
+            }
+            return 0.5 * s;
+          }
+
+          function dft(points) {
+            const N = points.length;
+            const z = points.map(function (p) { return complex(p.x, p.y); });
+            const out = [];
+            for (let k = 0; k < N; k += 1) {
+              let re = 0;
+              let im = 0;
+              for (let n = 0; n < N; n += 1) {
+                const ang = -2 * Math.PI * k * n / N;
+                const c = Math.cos(ang);
+                const s = Math.sin(ang);
+                re += z[n].re * c - z[n].im * s;
+                im += z[n].re * s + z[n].im * c;
+              }
+              re /= N;
+              im /= N;
+              // Low-frequency indexing according to the parity of N.
+              const positiveMax = Math.floor((N - 1) / 2);
+              const freq = k <= positiveMax ? k : k - N;
+              out.push({ k: k, freq: freq, re: re, im: im, amp: Math.hypot(re, im), phase: Math.atan2(im, re) });
+            }
+            return out;
+          }
+
+          function radiusOrder(coeffs) {
+            // c_0 is kept separate as the translation.  The rotating terms
+            // are ranked by radius |c_k|, from largest to smallest.
+            return coeffs
+              .filter(function (c) { return c.freq !== 0; })
+              .slice()
+              .sort(function (a, b) {
+                if (Math.abs(b.amp - a.amp) > 1e-12) return b.amp - a.amp;
+                // Deterministic tie-breaker: lower |frequency| first, then +k before -k.
+                const af = Math.abs(a.freq), bf = Math.abs(b.freq);
+                if (af !== bf) return af - bf;
+                return b.freq - a.freq;
+              });
+          }
+
+          function sampleCentroid() {
+            let cx = 0, cy = 0;
+            state.samples.forEach(function (p) { cx += p.x; cy += p.y; });
+            return { x: cx / state.samples.length, y: cy / state.samples.length };
+          }
+
+          function reconstruct(t) {
+            let z = complex(state.dc.re, state.dc.im);
+            for (const c of state.activeOrder) {
+              const rot = cexp(2 * Math.PI * c.freq * t);
+              z = cadd(z, cmul(complex(c.re, c.im), rot));
+            }
+            return z;
+          }
+
+          function epicycleChain(t) {
+            let z = complex(state.dc.re, state.dc.im);
+            const chain = [];
+            for (const c of state.activeOrder) {
+              const start = { re: z.re, im: z.im };
+              const rot = cexp(2 * Math.PI * c.freq * t);
+              const v = cmul(complex(c.re, c.im), rot);
+              z = cadd(z, v);
+              chain.push({ start: start, end: { re: z.re, im: z.im }, radius: c.amp, freq: c.freq, amp: c.amp });
+            }
+            return { chain: chain, end: z };
+          }
+
+          function applyCircleCount(resetTrace) {
+            if (!state.order.length) return;
+            const requested = parseInt(els.pointsRange.value, 10);
+            const count = clamp(Number.isFinite(requested) ? requested : 1, 1, state.order.length);
+            els.pointsRange.value = String(count);
+            state.activeOrder = state.order.slice(0, count);
+            if (resetTrace && state.closed) {
+              state.traceSegments = [];
+              const endpoint = reconstruct(state.t);
+              state.traceSegments.push([{ t: state.t, re: endpoint.re, im: endpoint.im }]);
+            }
+            updateSpectrum();
+            renderTables();
+            renderMiniEpicycles();
+            updateStats();
+          }
+
+          function buildFourier() {
+            // La DFT usa exactamente la lista de puntos de la curva cerrada.
+            // Esos puntos se generan durante el gesto con separación espacial
+            // aproximadamente constante y continúan sobre el segmento de cierre.
+            state.samples = state.raw.map(toMathPoint);
+            state.coeffs = dft(state.samples);
+            const dc = state.coeffs.find(function (c) { return c.freq === 0; });
+            state.dc = dc ? { re: dc.re, im: dc.im } : { re: 0, im: 0 };
+            state.order = radiusOrder(state.coeffs);
+            els.pointsRange.max = String(Math.max(1, state.order.length));
+            // Al terminar el dibujo, partimos de hasta 32 epiciclos,
+            // pero nunca más de los N-1 disponibles.
+            els.pointsRange.value = String(Math.max(1, Math.min(32, state.order.length)));
+            state.traceSegments = [];
+            state.t = 0;
+            state.showEpicycles = false;
+            state.showTrace = true;
+            applyCircleCount(false);
+          }
+          function updateSpectrum() {
+            els.spectrum.innerHTML = "";
+            els.freqStrip.innerHTML = "";
+            if (!state.order.length) {
+              els.coeffInfo.innerHTML = "La lista Fourier se construye con puntos aproximadamente equiespaciados sobre todo el contorno cerrado. El espectro aparecerá al soltar el mouse.";
+              typesetMath(els.coeffInfo);
+              return;
+            }
+            const spectrumOrder = state.order.slice(0, Math.min(180, state.order.length));
+            const amps = spectrumOrder.map(function (c) { return c.amp; });
+            const maxAmp = Math.max.apply(null, amps.concat([1]));
+            spectrumOrder.forEach(function (c, i) {
+              const bar = document.createElement("div");
+              bar.className = "spectrum-bar" + (i < state.activeOrder.length ? " active" : "");
+              bar.style.height = Math.max(2, 150 * c.amp / maxAmp) + "px";
+              bar.title = "k=" + c.freq + " · |c_k|=" + c.amp.toFixed(2);
+              els.spectrum.appendChild(bar);
+            });
+            const shown = state.activeOrder.slice(0, Math.min(13, state.activeOrder.length));
+            shown.forEach(function (c) {
+              const chip = document.createElement("span");
+              chip.className = "freq-chip";
+              chip.innerHTML = tex("k=" + (c.freq > 0 ? "+" + c.freq : String(c.freq)));
+              els.freqStrip.appendChild(chip);
+            });
+            if (state.activeOrder.length > shown.length) {
+              const chip = document.createElement("span");
+              chip.className = "freq-chip";
+              chip.innerHTML = tex(BS + "ldots");
+              els.freqStrip.appendChild(chip);
+            }
+            els.coeffInfo.innerHTML = tex("N=" + state.samples.length) + " puntos de la curva cerrada; " + tex("m=" + state.activeOrder.length) + " epiciclos activos de " + tex("N-1=" + state.order.length) + ".&nbsp;&nbsp; Las frecuencias se indexan en su versión de baja frecuencia según la paridad de " + tex("N") + ", y luego los epiciclos se ordenan por " + tex("|c_k|") + " de mayor a menor.";
+            typesetMath(els.coeffInfo);
+            typesetMath(els.freqStrip);
+          }
+
+          function sortHeader(key, label, sortState) {
+            const cls = sortState.key === key ? (sortState.dir === "asc" ? "sort-asc" : "sort-desc") : "";
+            return `<th class="${cls}" data-key="${key}">${label}</th>`;
+          }
+
+          function sortRows(rows, sortState) {
+            const key = sortState.key;
+            const dir = sortState.dir === "asc" ? 1 : -1;
+            return rows.slice().sort(function (a, b) {
+              const va = a[key], vb = b[key];
+              if (typeof va === "number" && typeof vb === "number") return dir * (va - vb);
+              return dir * String(va).localeCompare(String(vb), undefined, { numeric: true });
+            });
+          }
+
+          function renderTables() {
+            if (!els.pointsTableWrap || !els.coeffTableWrap) return;
+            if (!state.closed || !state.samples.length) {
+              els.pointsTableWrap.innerHTML = `<div class="math-small">La lista aparecerá al terminar el trazo.</div>`;
+              els.coeffTableWrap.innerHTML = `<div class="math-small">La DFT aparecerá al terminar el trazo.</div>`;
+              return;
+            }
+
+            const pointRows = state.samples.map(function (p, i) {
+              return { n: i, x: p.x, y: p.y, pair: "(" + fmtNum(p.x, 3) + ", " + fmtNum(p.y, 3) + ")" };
+            });
+            const activeFreqs = new Set(state.activeOrder.map(function(c){ return c.freq; }));
+            const coeffRows = [];
+            coeffRows.push({ rank: 0, k: 0, re: state.dc.re, im: state.dc.im, amp: Math.hypot(state.dc.re, state.dc.im), radius: Math.hypot(state.dc.re, state.dc.im), pair: "(" + fmtNum(state.dc.re, 3) + ", " + fmtNum(state.dc.im, 3) + ")", active: false });
+            state.order.forEach(function (c, i) {
+              coeffRows.push({ rank: i + 1, k: c.freq, re: c.re, im: c.im, amp: c.amp, radius: c.amp, pair: "(" + fmtNum(c.re, 3) + ", " + fmtNum(c.im, 3) + ")", active: activeFreqs.has(c.freq) });
+            });
+
+            const pRows = sortRows(pointRows, state.sortPoints);
+            const cRows = sortRows(coeffRows, state.sortCoeffs);
+            let pHtml = `<table class="data-grid"><thead><tr>` +
+              sortHeader("n", "n", state.sortPoints) + sortHeader("pair", "(x_n,y_n)", state.sortPoints) +
+              sortHeader("x", "x_n", state.sortPoints) + sortHeader("y", "y_n", state.sortPoints) +
+              "</tr></thead><tbody>";
+            pRows.forEach(function (r) {
+              pHtml += `<tr><td class="num">${r.n}</td><td>${r.pair}</td><td class="num">${fmtNum(r.x, 3)}</td><td class="num">${fmtNum(r.y, 3)}</td></tr>`;
+            });
+            pHtml += "</tbody></table>";
+            els.pointsTableWrap.innerHTML = pHtml;
+
+            let cHtml = `<table class="data-grid"><thead><tr>` +
+              sortHeader("rank", "orden", state.sortCoeffs) + sortHeader("k", "k", state.sortCoeffs) +
+              sortHeader("pair", "c_k=(Re,Im)", state.sortCoeffs) + sortHeader("radius", "radio", state.sortCoeffs) + "</tr></thead><tbody>";
+            cRows.forEach(function (r) {
+              cHtml += `<tr${r.active ? ` class="active-coeff"` : ""}><td class="num">${r.rank}</td><td class="num">${r.k}</td><td>${r.pair}</td><td class="num">${fmtNum(r.radius, 3)}</td></tr>`;
+            });
+            cHtml += "</tbody></table>";
+            els.coeffTableWrap.innerHTML = cHtml;
+          }
+
+          const miniEntries = [];
+          function renderMiniEpicycles() {
+            if (!els.miniStrip) return;
+            els.miniStrip.innerHTML = "";
+            miniEntries.length = 0;
+            if (!state.closed || !state.activeOrder.length) return;
+            const shown = state.activeOrder.slice(0, Math.min(8, state.activeOrder.length));
+            shown.forEach(function (c) {
+              const card = document.createElement("div");
+              card.className = "mini-clock";
+              const cv = document.createElement("canvas");
+              cv.width = 68;
+              cv.height = 68;
+              const lab = document.createElement("div");
+              lab.className = "mini-clock-label";
+              lab.textContent = "k=" + (c.freq > 0 ? "+" + c.freq : String(c.freq));
+              card.appendChild(cv);
+              card.appendChild(lab);
+              els.miniStrip.appendChild(card);
+              miniEntries.push({ canvas: cv, coeff: c });
+            });
+            if (state.activeOrder.length > 8) {
+              const dots = document.createElement("div");
+              dots.className = "mini-ellipsis";
+              dots.textContent = "…";
+              els.miniStrip.appendChild(dots);
+            }
+            paintMiniEpicycles();
+          }
+
+          function paintMiniEpicycles() {
+            miniEntries.forEach(function (entry) {
+              const cc = entry.canvas.getContext("2d");
+              const c = entry.coeff;
+              const cx = 34, cy = 34, r = 23;
+              cc.clearRect(0, 0, 68, 68);
+              cc.beginPath(); cc.arc(cx, cy, r, 0, 2 * Math.PI);
+              cc.strokeStyle = "rgba(124,58,237,.30)"; cc.lineWidth = 1.4; cc.stroke();
+              const angle = Math.atan2(c.im, c.re) + 2 * Math.PI * c.freq * state.t;
+              const ex = cx + r * Math.cos(angle);
+              const ey = cy - r * Math.sin(angle);
+              cc.beginPath(); cc.moveTo(cx, cy); cc.lineTo(ex, ey);
+              cc.strokeStyle = "rgba(15,23,42,.82)"; cc.lineWidth = 2; cc.stroke();
+              cc.beginPath(); cc.arc(ex, ey, 3, 0, 2 * Math.PI); cc.fillStyle = "#0f172a"; cc.fill();
+            });
+          }
+
+          function updateStats() {
+            els.pointsValue.textContent = els.pointsRange.value;
+            els.speedValue.textContent = Number(els.speedRange.value).toFixed(1) + "×";
+            els.statPoints.textContent = state.closed ? String(state.userPointCount) : String(state.raw.length);
+            els.statFreq.textContent = state.closed ? String(state.activeOrder.length) : "—";
+            if (els.statFreqSub) {
+              els.statFreqSub.textContent = state.closed
+                ? "de " + state.order.length + " disponibles · N = " + state.samples.length
+                : "se determinará al terminar el trazo";
+            }
+            els.pointsRange.disabled = !state.closed;
+            if (state.closed) {
+              els.statState.textContent = state.playing ? "Animando" : "Pausado";
+              els.statStateSub.textContent = "t = " + state.t.toFixed(3);
+            } else if (state.drawing) {
+              els.statState.textContent = "Dibujando";
+              els.statStateSub.textContent = "se cerrará al soltar";
+            } else {
+              els.statState.textContent = "Lista";
+              els.statStateSub.textContent = "dibuja cualquier curva";
+            }
+            els.reveal.disabled = !state.closed;
+            els.play.disabled = !state.closed;
+            els.traceToggle.disabled = !state.closed;
+            els.reveal.textContent = state.showEpicycles ? "◌ Ocultar epiciclos" : "✦ Mostrar epiciclos";
+            els.play.textContent = state.playing ? "❚❚ Pausar" : "▶ Reproducir";
+            els.traceToggle.textContent = state.showTrace ? "Ocultar trazo magenta" : "Mostrar trazo magenta";
+          }
+          function resetAll() {
+            stopAnimation();
+            state.drawing = false;
+            state.invalid = false;
+            state.closed = false;
+            state.mode = "draw";
+            state.raw = [];
+            state.userPointCount = 0;
+            state.samples = [];
+            state.coeffs = [];
+            state.order = [];
+            state.activeOrder = [];
+            state.dc = { re: 0, im: 0 };
+            state.curveCenter = { x: 0, y: 0 };
+            state.traceSegments = [];
+            state.t = 0;
+            state.showEpicycles = false;
+            state.showTrace = true;
+            state.totalLength = 0;
+            state.pointerId = null;
+            state.pointerLast = null;
+            state.sampleCarry = 0;
+            updateSpectrum();
+            renderTables();
+            renderMiniEpicycles();
+            updateStats();
+            render();
+          }
+
+          function appendEquispacedAlongSegment(a, b) {
+            const len = dist(a, b);
+            if (len <= 1e-8) return;
+            let consumed = 0;
+            while (state.sampleCarry + (len - consumed) >= state.sampleSpacing - 1e-9) {
+              const need = state.sampleSpacing - state.sampleCarry;
+              consumed += need;
+              const u = Math.min(1, consumed / len);
+              const q = {
+                x: a.x + u * (b.x - a.x),
+                y: a.y + u * (b.y - a.y)
+              };
+              // During the closing segment, do not duplicate P_0 at the end.
+              if (!state.raw.length || dist(q, state.raw[0]) > 1e-5 || consumed < len - 1e-7) {
+                const lastStored = state.raw[state.raw.length - 1];
+                if (!lastStored || dist(lastStored, q) > 1e-6) state.raw.push(q);
+              }
+              state.sampleCarry = 0;
+            }
+            state.sampleCarry += Math.max(0, len - consumed);
+          }
+
+          function ingestPointerPoint(p) {
+            if (!state.pointerLast) {
+              state.pointerLast = p;
+              return;
+            }
+            const a = state.pointerLast;
+            const len = dist(a, p);
+            if (len <= 1e-8) return;
+
+            if (els.snapToggle && els.snapToggle.checked) {
+              const lastStored = state.raw[state.raw.length - 1];
+              if (!lastStored || dist(lastStored, p) > 1e-8) {
+                state.raw.push({ x: p.x, y: p.y });
+              }
+              state.sampleCarry = 0;
+            } else {
+              appendEquispacedAlongSegment(a, p);
+            }
+            state.totalLength += len;
+            state.pointerLast = p;
+          }
+
+          function finalizeCurve() {
+            if (state.raw.length < 2 || state.totalLength < 12 || !state.pointerLast) {
+              state.drawing = false;
+              state.raw = [];
+              state.totalLength = 0;
+              state.pointerLast = null;
+              state.sampleCarry = 0;
+              updateStats();
+              render();
+              return;
+            }
+
+            state.drawing = false;
+
+            // Preserve the released endpoint explicitly.  It is the corner where
+            // the user gesture meets the straight closing segment, so omitting
+            // it can artificially round that corner (especially for a line).
+            const released = { x: state.pointerLast.x, y: state.pointerLast.y };
+            const lastStoredBeforeClose = state.raw[state.raw.length - 1];
+            if (dist(lastStoredBeforeClose, released) > 0.75) {
+              state.raw.push(released);
+            }
+
+            // Start the closing segment from that corner and place new points at
+            // approximately the same spacing.  P_0 itself is not duplicated.
+            state.sampleCarry = 0;
+            const first = state.raw[0];
+            const closeStart = released;
+            const closeLength = dist(closeStart, first);
+            if (closeLength > 1e-8) {
+              if (els.snapToggle && els.snapToggle.checked) {
+                const aM = toMathPoint(closeStart);
+                const bM = toMathPoint(first);
+                const dxI = Math.round(bM.x - aM.x);
+                const dyI = Math.round(bM.y - aM.y);
+                const g = gcdInt(dxI, dyI);
+                if (g > 1) {
+                  for (let j = 1; j < g; j += 1) {
+                    const qM = { x: aM.x + dxI * j / g, y: aM.y + dyI * j / g };
+                    const q = toScreenPoint({ re: qM.x, im: qM.y });
+                    const lastStored = state.raw[state.raw.length - 1];
+                    if (!lastStored || dist(lastStored, q) > 1e-8) state.raw.push(q);
+                  }
+                }
+              } else {
+                appendEquispacedAlongSegment(closeStart, first);
+              }
+              state.totalLength += closeLength;
+            }
+
+            // P_0 is not duplicated: periodicity closes the list implicitly.
+            // If the final generated point happened numerically to coincide
+            // with P_0, remove that duplicate.
+            if (state.raw.length > 1 && dist(state.raw[state.raw.length - 1], first) < 1e-5) {
+              state.raw.pop();
+            }
+
+            if (state.raw.length < 3) {
+              state.raw = [];
+              state.totalLength = 0;
+              state.pointerLast = null;
+              state.sampleCarry = 0;
+              updateStats();
+              render();
+              return;
+            }
+
+            state.userPointCount = state.raw.length;
+            state.closed = true;
+            buildFourier();
+            state.mode = "epicycle";
+            state.playing = false;
+            state.showEpicycles = false;
+            state.showTrace = true;
+            state.traceSegments = [];
+            const endpoint = reconstruct(state.t);
+            state.traceSegments.push([{ t: state.t, re: endpoint.re, im: endpoint.im }]);
+            renderTables();
+            renderMiniEpicycles();
+            updateStats();
+            render();
+          }
+
+          function beginDraw(e) {
+            if (state.closed) resetAll();
+            const p = eventPoint(e);
+            state.drawing = true;
+            state.pointerId = e.pointerId;
+            state.pointerLast = p;
+            state.sampleCarry = 0;
+            state.raw = [p];
+            state.userPointCount = 0;
+            state.totalLength = 0;
+            if (canvas.setPointerCapture && e.pointerId != null) {
+              try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+            }
+            updateStats();
+            render();
+          }
+
+          function continueDraw(e) {
+            if (!state.drawing) return;
+            if (state.pointerId != null && e.pointerId != null && state.pointerId !== e.pointerId) return;
+            const p = eventPoint(e);
+            ingestPointerPoint(p);
+            updateStats();
+            render();
+          }
+
+          function endDraw(e) {
+            if (!state.drawing) return;
+            if (state.pointerId != null && e.pointerId != null && state.pointerId !== e.pointerId) return;
+            if (!state.closed) {
+              ingestPointerPoint(eventPoint(e));
+              finalizeCurve();
+            }
+            if (canvas.releasePointerCapture && e.pointerId != null) {
+              try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+            }
+            state.pointerId = null;
+            state.pointerLast = null;
+            updateStats();
+            render();
+          }
+
+          function revealEpicycles() {
+            if (!state.closed) return;
+            state.showEpicycles = !state.showEpicycles;
+            updateStats();
+            render();
+          }
+          function startAnimation() {
+            if (state.raf !== null) return;
+            state.lastFrame = performance.now();
+            state.raf = requestAnimationFrame(frame);
+          }
+
+          function stopAnimation() {
+            state.playing = false;
+            if (state.raf !== null) cancelAnimationFrame(state.raf);
+            state.raf = null;
+          }
+
+          function frame(now) {
+            state.raf = null;
+            if (!state.playing || !state.closed) return;
+            const dt = Math.min(0.05, Math.max(0, (now - state.lastFrame) / 1000));
+            state.lastFrame = now;
+            const speed = Number(els.speedRange.value);
+            state.t += dt * 0.105 * speed;
+            if (state.t >= 1) {
+              state.t = state.t % 1;
+            }
+            const endpoint = reconstruct(state.t);
+            if (!state.traceSegments.length) state.traceSegments.push([]);
+            state.traceSegments[state.traceSegments.length - 1].push({ t: state.t, re: endpoint.re, im: endpoint.im });
+            updateStats();
+            render();
+            state.raf = requestAnimationFrame(frame);
+          }
+
+          function drawGrid() {
+            ctx.save();
+            ctx.strokeStyle = "#e8edf4";
+            ctx.lineWidth = 1;
+            const step = state.gridStep;
+            const ox = state.width / 2;
+            const oy = state.height / 2;
+            for (let x = ox % step; x <= state.width; x += step) {
+              ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, state.height); ctx.stroke();
+            }
+            for (let y = oy % step; y <= state.height; y += step) {
+              ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(state.width, y); ctx.stroke();
+            }
+            ctx.strokeStyle = "#cbd5e1";
+            ctx.lineWidth = 1.15;
+            ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(state.width, oy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, state.height); ctx.stroke();
+            ctx.restore();
+          }
+
+          function drawPolyline(points, stroke, width, alpha) {
+            if (!points || points.length < 2) return;
+            ctx.save();
+            ctx.globalAlpha = alpha == null ? 1 : alpha;
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = width;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i].x, points[i].y);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          function drawDrawingMode() {
+            if (!state.raw.length) {
+              ctx.save();
+              ctx.fillStyle = "#64748b";
+              ctx.font = "700 15px Inter, system-ui, sans-serif";
+              ctx.textAlign = "center";
+              ctx.fillText("Dibuja aquí una curva cerrada", state.width / 2, state.height / 2 - 6);
+              ctx.font = "12px Inter, system-ui, sans-serif";
+              ctx.fillStyle = "#94a3b8";
+              ctx.fillText("al soltar, el extremo se une con el inicio", state.width / 2, state.height / 2 + 16);
+              ctx.restore();
+              return;
+            }
+            drawPolyline(state.raw, "#a78bfa", 2, 1);
+            const first = state.raw[0];
+            ctx.save();
+            ctx.fillStyle = "rgba(22,163,74,.13)";
+            ctx.strokeStyle = "#16a34a";
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(first.x, first.y, 18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.arc(first.x, first.y, 5, 0, Math.PI * 2); ctx.fillStyle = "#16a34a"; ctx.fill();
+            ctx.restore();
+          }
+
+          function drawEpicycleMode() {
+            if (!state.activeOrder.length) return;
+            // No recentramos ni reescalamos: los coeficientes se calculan
+            // directamente con z_n = x_n + i y_n en coordenadas del lienzo.
+            const toScreen = function (z) {
+              return toScreenPoint(z);
+            };
+            // state.raw es la lista Fourier de la curva cerrada. Para mostrar
+            // el último segmento periódico añadimos P_0 sólo a una copia visual.
+            const targetPts = state.raw.length
+              ? state.raw.concat([{ x: state.raw[0].x, y: state.raw[0].y }])
+              : [];
+            drawPolyline(targetPts, "#a78bfa", 2, 1);
+
+            const data = epicycleChain(state.t);
+            if (state.showEpicycles) {
+            ctx.save();
+            ctx.lineCap = "round";
+            // circunferencia fija asociada a c0: centro en el origen, radio |c0|; su brazo no gira
+            const origin = toScreen({ re: 0, im: 0 });
+            const dcPt = toScreen(state.dc);
+            const r0 = Math.hypot(state.dc.re, state.dc.im) * state.gridStep;
+            if (r0 >= .7) {
+              ctx.beginPath();
+              ctx.setLineDash([6, 5]);
+              ctx.arc(origin.x, origin.y, r0, 0, Math.PI * 2);
+              ctx.strokeStyle = "rgba(124,58,237,.38)";
+              ctx.lineWidth = 1.4;
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+            ctx.beginPath();
+            ctx.moveTo(origin.x, origin.y);
+            ctx.lineTo(dcPt.x, dcPt.y);
+            ctx.strokeStyle = "rgba(15,23,42,.75)";
+            ctx.lineWidth = 1.7;
+            ctx.stroke();
+            {
+              const dx0 = dcPt.x - origin.x;
+              const dy0 = dcPt.y - origin.y;
+              const len0 = Math.hypot(dx0, dy0);
+              if (len0 > 8) {
+                const ux = dx0 / len0, uy = dy0 / len0;
+                const px = -uy, py = ux;
+                const hx = dcPt.x - 6 * ux, hy = dcPt.y - 6 * uy;
+                ctx.beginPath();
+                ctx.moveTo(dcPt.x, dcPt.y);
+                ctx.lineTo(hx + 3.4 * px, hy + 3.4 * py);
+                ctx.lineTo(hx - 3.4 * px, hy - 3.4 * py);
+                ctx.closePath();
+                ctx.fillStyle = "rgba(15,23,42,.72)";
+                ctx.fill();
+              }
+            }
+            for (let i = 0; i < data.chain.length; i += 1) {
+              const item = data.chain[i];
+              const a = toScreen(item.start);
+              const b = toScreen(item.end);
+              const r = item.radius * state.gridStep;
+              if (r >= .7) {
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, r, 0, Math.PI * 2);
+                ctx.strokeStyle = i < 10 ? "rgba(124,58,237,.24)" : "rgba(100,116,139,.13)";
+                ctx.lineWidth = i < 10 ? 1.25 : .8;
+                ctx.stroke();
+              }
+              ctx.beginPath();
+              ctx.moveTo(a.x, a.y);
+              ctx.lineTo(b.x, b.y);
+              ctx.strokeStyle = i < 10 ? "rgba(15,23,42,.75)" : "rgba(71,85,105,.35)";
+              ctx.lineWidth = i < 10 ? 1.7 : 1;
+              ctx.stroke();
+              if (i < 14) {
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const len = Math.hypot(dx, dy);
+                if (len > 8) {
+                  const ux = dx / len, uy = dy / len;
+                  const px = -uy, py = ux;
+                  const hx = b.x - 6 * ux, hy = b.y - 6 * uy;
+                  ctx.beginPath();
+                  ctx.moveTo(b.x, b.y);
+                  ctx.lineTo(hx + 3.4 * px, hy + 3.4 * py);
+                  ctx.lineTo(hx - 3.4 * px, hy - 3.4 * py);
+                  ctx.closePath();
+                  ctx.fillStyle = "rgba(15,23,42,.72)";
+                  ctx.fill();
+                }
+              }
+            }
+            ctx.restore();
+            }
+
+            if (state.showTrace) state.traceSegments.forEach(function (segment) {
+              if (segment.length > 1) {
+                const tracePts = segment.map(function (z) { return toScreen(z); });
+                drawPolyline(tracePts, "#ec4899", 3.2, 1);
+              }
+            });
+            if (state.showTrace) {
+            const end = toScreen(data.end);
+            ctx.save();
+            ctx.beginPath(); ctx.arc(end.x, end.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = "#ec4899"; ctx.fill();
+            ctx.beginPath(); ctx.arc(end.x, end.y, 11, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(236,72,153,.28)"; ctx.lineWidth = 5; ctx.stroke();
+            ctx.restore();
+            }
+          }
+
+          function render() {
+            if (!ctx || !state.width || !state.height) return;
+            ctx.clearRect(0, 0, state.width, state.height);
+            drawGrid();
+            if (state.closed) drawEpicycleMode(); else drawDrawingMode();
+            if (state.closed) paintMiniEpicycles();
+          }
+
+          canvas.addEventListener("pointerdown", function (e) {
+            e.preventDefault();
+            beginDraw(e);
+          }, { passive:false });
+          canvas.addEventListener("pointermove", function (e) {
+            if (!state.drawing) return;
+            e.preventDefault();
+            continueDraw(e);
+          }, { passive:false });
+          canvas.addEventListener("pointerup", function (e) {
+            if (!state.drawing) return;
+            e.preventDefault();
+            endDraw(e);
+          }, { passive:false });
+          canvas.addEventListener("pointercancel", function (e) {
+            if (!state.drawing) return;
+            endDraw(e);
+          });
+
+          if (!("PointerEvent" in window)) {
+            canvas.addEventListener("mousedown", function(e){ e.preventDefault(); beginDraw(e); });
+            canvas.addEventListener("mousemove", function(e){ if(state.drawing){ e.preventDefault(); continueDraw(e); } });
+            canvas.addEventListener("mouseup", function(e){ if(state.drawing){ e.preventDefault(); endDraw(e); } });
+            canvas.addEventListener("mouseleave", function(e){ if(state.drawing){ endDraw(e); } });
+          }
+
+          els.reset.addEventListener("click", resetAll);
+          els.reveal.addEventListener("click", revealEpicycles);
+          els.play.addEventListener("click", function () {
+            if (!state.closed) return;
+            state.playing = !state.playing;
+            if (state.playing) {
+              if (!state.traceSegments.length) {
+                const endpoint = reconstruct(state.t);
+                state.traceSegments.push([{ t: state.t, re: endpoint.re, im: endpoint.im }]);
+              }
+              startAnimation();
+            } else {
+              stopAnimation();
+            }
+            updateStats();
+            render();
+          });
+          els.pointsRange.addEventListener("input", function () {
+            els.pointsValue.textContent = this.value;
+            if (state.closed && state.order.length) {
+              applyCircleCount(true);
+            }
+            updateStats();
+            render();
+          });
+          els.traceToggle.addEventListener("click", function () {
+            if (!state.closed) return;
+            state.showTrace = !state.showTrace;
+            if (state.showTrace) {
+              state.traceSegments = [];
+              const endpoint = reconstruct(state.t);
+              state.traceSegments.push([{ t: state.t, re: endpoint.re, im: endpoint.im }]);
+            }
+            updateStats();
+            render();
+          });
+          els.speedRange.addEventListener("input", function () { updateStats(); });
+          if (els.snapToggle) {
+            els.snapToggle.addEventListener("change", function () {
+              if (state.drawing) resetAll();
+              render();
+            });
+          }
+          if (els.pointsTableWrap) {
+            els.pointsTableWrap.addEventListener("click", function (e) {
+              const th = e.target.closest("th[data-key]");
+              if (!th) return;
+              const key = th.getAttribute("data-key");
+              state.sortPoints.dir = (state.sortPoints.key === key && state.sortPoints.dir === "asc") ? "desc" : "asc";
+              state.sortPoints.key = key;
+              renderTables();
+            });
+          }
+          if (els.coeffTableWrap) {
+            els.coeffTableWrap.addEventListener("click", function (e) {
+              const th = e.target.closest("th[data-key]");
+              if (!th) return;
+              const key = th.getAttribute("data-key");
+              state.sortCoeffs.dir = (state.sortCoeffs.key === key && state.sortCoeffs.dir === "asc") ? "desc" : "asc";
+              state.sortCoeffs.key = key;
+              renderTables();
+            });
+          }
+          window.addEventListener("resize", resizeCanvas);
+
+          resizeCanvas();
+          resetAll();
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", initFourierApp, { once: true });
+        } else {
+          initFourierApp();
+        }
+      })();
+    '))
+  ),
+  tags$div(
+    id = "fourier-app",
+    class = "app-shell",
+    tags$div(
+      class = "hero-card",
+      tags$div(class = "badge", HTML("&#10022; Transformada discreta de Fourier")),
+      tags$h1(class = "hero-title", "Dibuja con epiciclos de Fourier"),
+      tags$p(
+        class = "hero-subtitle",
+        "Traza libremente una curva; puede cruzarse consigo misma. Mientras dibujas, la app genera puntos aproximadamente equiespaciados a lo largo del gesto y, al soltar, continúa ese muestreo sobre el segmento que cierra la curva. La DFT usa la versión de bajas frecuencias correcta para N par o impar; después los epiciclos se ordenan por radio |cₖ|, de mayor a menor."
+      ),
+      tags$div(
+        class = "stats-grid",
+        tags$div(class = "stat-card", tags$div(class = "stat-label", "Puntos de la curva"), tags$div(id = "stat-points", class = "stat-value", "0"), tags$div(class = "stat-subvalue", "aprox. equiespaciados · incluye el cierre")),
+        tags$div(class = "stat-card", tags$div(class = "stat-label", "Epiciclos activos"), tags$div(id = "stat-freq", class = "stat-value", "—"), tags$div(id = "stat-freq-sub", class = "stat-subvalue", "se determinará al terminar el trazo")),
+        tags$div(class = "stat-card", tags$div(class = "stat-label", "Estado"), tags$div(id = "stat-state", class = "stat-value", "Lista"), tags$div(id = "stat-state-sub", class = "stat-subvalue", "dibuja cualquier curva"))
+      )
+    ),
+    tags$div(
+      class = "play-grid",
+      tags$div(
+        class = "board-card",
+        tags$div(
+          class = "section-head",
+          tags$div(class = "section-icon", HTML("&#9998;")),
+          tags$div(tags$h2(class = "section-title", "Lienzo de Fourier"), tags$p(class = "section-subtitle", "Primero dibuja. Después controla por separado la animación, los epiciclos y el trazo reconstruido, sin mover ni reencuadrar tu figura."))
+        ),
+        tags$div(
+          class = "controls-grid",
+          tags$div(
+            class = "control-box",
+            tags$label(class = "control-label", `for` = "points-range", "Epiciclos / términos Fourier"),
+            tags$div(class = "range-row", tags$input(id = "points-range", type = "range", min = "1", max = "1", step = "1", value = "1", disabled = "disabled"), tags$span(id = "points-value", class = "range-value", "1")),
+            tags$div(class = "math-small", style = "margin-top:6px;", "máximo: N − 1, donde N es el número de puntos de la curva cerrada")
+          ),
+          tags$div(
+            class = "control-box",
+            tags$label(class = "control-label", `for` = "speed-range", "Velocidad"),
+            tags$div(class = "range-row", tags$input(id = "speed-range", type = "range", min = "0.4", max = "2.5", step = "0.1", value = "1"), tags$span(id = "speed-value", class = "range-value", "1.0×"))
+          ),
+          tags$button(id = "reset-curve", class = "control-button", HTML("&#8635; Reiniciar"))
+        ),
+        tags$div(
+          class = "button-row",
+          tags$button(id = "reveal-epicycles", class = "control-button accent", disabled = "disabled", HTML("&#10022; Mostrar epiciclos")),
+          tags$button(id = "play-pause", class = "control-button primary", disabled = "disabled", HTML("&#9654; Reproducir")),
+          tags$button(id = "toggle-trace", class = "control-button", disabled = "disabled", "Ocultar trazo magenta"),
+          tags$label(class = "toggle-inline", tags$input(id = "snap-grid", type = "checkbox"), "Atracción a la cuadrícula")
+        ),
+        tags$div(
+          class = "board-wrap",
+          tags$canvas(id = "fourier-canvas"),
+          tags$div(class = "board-tip", "Arrastra dentro del lienzo → DFT → epiciclos")
+        ),
+        tags$div(id = "mini-epicycles", class = "mini-strip"),
+        tags$div(
+          class = "legend-row",
+          tags$div(class = "legend-chip", tags$span(class = "legend-dot", style = "background:#a78bfa;"), "curva objetivo"),
+          tags$div(class = "legend-chip", tags$span(class = "legend-dot", style = "background:#0f172a;"), "vectores Fourier"),
+          tags$div(class = "legend-chip", tags$span(class = "legend-dot", style = "background:#ec4899;"), "trazo reconstruido"),
+          tags$div(class = "legend-chip", tags$span(class = "legend-dot", style = "background:#16a34a;"), "punto de cierre")
+        ),
+        tags$div(
+          class = "tables-grid",
+          tags$div(
+            class = "table-card",
+            tags$h3(class = "table-title", "Puntos muestreados"),
+            tags$p(class = "table-note", "Haz clic en un encabezado para cambiar el orden."),
+            tags$div(id = "points-table-wrap", class = "table-wrap", tags$div(class = "math-small", "La lista aparecerá al terminar el trazo."))
+          ),
+          tags$div(
+            class = "table-card",
+            tags$h3(class = "table-title", "Coeficientes de la DFT"),
+            tags$p(class = "table-note", "El radio del epiciclo es |cₖ|; las filas activas se resaltan."),
+            tags$div(id = "coeff-table-wrap", class = "table-wrap", tags$div(class = "math-small", "La DFT aparecerá al terminar el trazo."))
+          )
+        )
+      ),
+      tags$div(
+        class = "math-card",
+        tags$div(
+          class = "section-head",
+          tags$div(class = "section-icon", HTML("&#8764;")),
+          tags$div(tags$h2(class = "section-title", "La máquina detrás del dibujo"), tags$p(class = "section-subtitle", "Cada coeficiente de Fourier se convierte en un vector giratorio y en la circunferencia recorrida por su extremo."))
+        ),
+        tags$div(
+          class = "math-stack",
+          tags$div(
+            class = "math-box",
+            tags$div(class = "math-kicker", "Puntos complejos"),
+            tags$div(class = "math-formula", "\\[z_n=x_n+i y_n\\]"),
+            tags$div(class = "math-small", HTML("Los puntos se generan aproximadamente a igual distancia sobre todo el contorno, incluido el segmento de cierre. Esos mismos \\(N\\) pares \\((x_n,y_n)\\) forman la lista de la DFT."))
+          ),
+          tags$div(
+            class = "math-box",
+            tags$div(class = "math-kicker", "DFT de bajas frecuencias"),
+            tags$div(class = "math-formula", "\\[c_k=\\frac{1}{N}\\sum_{n=0}^{N-1}z_n e^{-2\\pi i kn/N}\\]"),
+            tags$div(class = "math-small", HTML("Si \\(N=2m+1\\): \\(k=-m,\\ldots,m\\). Si \\(N=2m\\): \\(k=-m,\\ldots,m-1\\)."))
+          ),
+          tags$div(
+            class = "math-box",
+            tags$div(class = "math-kicker", "Reconstrucción"),
+            tags$div(class = "math-formula", "\\[z(t)=c_0+\\sum_{k\\ne 0}c_k e^{2\\pi i k t}\\]"),
+            tags$div(class = "math-small", HTML("La punta del último vector es \\(z(t)\\). Después de asignar las frecuencias bajas, los términos giratorios se encadenan de mayor a menor radio \\(|c_k|\\)."))
+          ),
+          tags$div(
+            class = "math-box",
+            tags$div(class = "math-kicker", "Espectro de radios"),
+            tags$div(id = "coeff-info", class = "math-small", "La lista Fourier se construye con puntos aproximadamente equiespaciados sobre todo el contorno cerrado. El espectro aparecerá al soltar el mouse."),
+            tags$div(id = "spectrum", class = "spectrum"),
+            tags$div(id = "frequency-strip", class = "frequency-strip")
+          )
+        )
+      )
+    )
+  )
+))
+
+server <- function(input, output, session) {
+  # La interacción vive en JavaScript para mantener la animación fluida.
+}
+
+shinyApp(ui, server)

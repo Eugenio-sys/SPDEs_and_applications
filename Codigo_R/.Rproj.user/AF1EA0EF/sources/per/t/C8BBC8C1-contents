@@ -1,0 +1,1520 @@
+library(shiny)
+
+# Malabares y matemáticas: siteswap, la prueba de la permutación y el grafo de estados
+# Toda la lógica vive en JavaScript (misma arquitectura que las apps del planímetro y las Torres de Hanoi).
+# Guardar este archivo en UTF-8.
+
+ui <- fluidPage(
+  tags$head(
+    tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
+    tags$style(HTML("
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+        background: radial-gradient(circle at top, #f8fafc 0%, #e2e8f0 58%, #dbe4ef 100%);
+        color: #0f172a;
+      }
+      .app-shell {
+        max-width: 1260px;
+        margin: 0 auto;
+        padding: 18px;
+      }
+      .hero-card,
+      .board-card,
+      .graph-card,
+      .success-card,
+      .challenge-panel {
+        background: rgba(255,255,255,0.78);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.72);
+        border-radius: 30px;
+        box-shadow: 0 18px 45px rgba(15,23,42,0.10);
+      }
+      .hero-card { padding: 28px; }
+      .board-card, .graph-card { padding: 22px; }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        padding: 7px 12px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+      .hero-title {
+        margin: 14px 0 0;
+        max-width: 860px;
+        font-size: clamp(2rem, 4.2vw, 3.4rem);
+        line-height: 1.02;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        color: #020617;
+      }
+      .hero-subtitle {
+        margin: 14px 0 0;
+        max-width: 860px;
+        font-size: 16px;
+        line-height: 1.75;
+        color: #475569;
+      }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 22px;
+      }
+      .stat-card {
+        border-radius: 24px;
+        border: 1px solid #e2e8f0;
+        background: rgba(255,255,255,0.9);
+        padding: 16px;
+        box-shadow: 0 4px 16px rgba(15,23,42,0.05);
+        min-width: 0;
+      }
+      .stat-label {
+        font-size: 13px;
+        color: #64748b;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .stat-value {
+        font-size: 29px;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .stat-subvalue {
+        margin-top: 6px;
+        min-height: 2.9em;
+        font-size: 12px;
+        color: #64748b;
+        line-height: 1.45;
+      }
+      .play-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.22fr) minmax(320px, 0.78fr);
+        gap: 18px;
+        align-items: start;
+      }
+      .section-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+      .section-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 16px;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 18px;
+        flex: 0 0 auto;
+        box-shadow: 0 8px 18px rgba(15,23,42,0.18);
+      }
+      .section-title {
+        margin: 0;
+        font-size: 25px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+      .section-subtitle {
+        margin: 5px 0 0;
+        font-size: 14px;
+        line-height: 1.7;
+        color: #64748b;
+      }
+      .controls-grid {
+        display: grid;
+        grid-template-columns: 1.15fr 0.9fr 1.05fr auto auto;
+        gap: 12px;
+        align-items: end;
+        margin-bottom: 16px;
+      }
+      .control-box {
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        background: rgba(255,255,255,0.9);
+        padding: 14px 16px;
+      }
+      .control-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #334155;
+      }
+      .control-select {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 14px;
+        padding: 12px 14px;
+        font-size: 15px;
+        font-weight: 700;
+        color: #0f172a;
+        background: #ffffff;
+      }
+      .control-button {
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 14px 18px;
+        font-size: 14px;
+        font-weight: 800;
+        color: #334155;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(15,23,42,0.05);
+        transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+      }
+      .control-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px rgba(15,23,42,0.09);
+        background: #f8fafc;
+      }
+      .control-button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+      .switch-card {
+        min-width: 188px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .switch-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .switch-label-text {
+        font-size: 14px;
+        font-weight: 800;
+        color: #0f172a;
+      }
+      .switch-subtext {
+        margin-top: 4px;
+        font-size: 12px;
+        color: #64748b;
+        line-height: 1.5;
+      }
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 54px;
+        height: 30px;
+        flex: 0 0 auto;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider-switch {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: #cbd5e1;
+        transition: .2s;
+        border-radius: 999px;
+      }
+      .slider-switch:before {
+        position: absolute;
+        content: '';
+        height: 24px;
+        width: 24px;
+        left: 3px;
+        top: 3px;
+        background: white;
+        transition: .2s;
+        border-radius: 50%;
+        box-shadow: 0 4px 10px rgba(15,23,42,0.16);
+      }
+      .switch input:checked + .slider-switch {
+        background: #7c3aed;
+      }
+      .switch input:checked + .slider-switch:before {
+        transform: translateX(24px);
+      }
+      .message-box {
+        margin-top: 14px;
+        min-height: 50px;
+        border-radius: 18px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        padding: 14px 16px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #334155;
+      }
+      .pr-panel {
+        margin-top: 12px;
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        background: rgba(255,255,255,0.9);
+        padding: 14px 16px;
+        box-shadow: 0 4px 14px rgba(15,23,42,0.05);
+      }
+      .pr-panel.pr-on {
+        border-color: #ddd6fe;
+        background: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 100%);
+      }
+      .pr-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .pr-title {
+        margin: 0 0 6px;
+        font-size: 16px;
+        font-weight: 900;
+        color: #0f172a;
+      }
+      .pr-text {
+        margin: 0;
+        max-width: 620px;
+        font-size: 13px;
+        line-height: 1.65;
+        color: #475569;
+      }
+      .pr-legend {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed #e2e8f0;
+        font-size: 12.5px;
+        line-height: 1.65;
+        color: #475569;
+      }
+      .control-button.active {
+        background: #7c3aed;
+        color: #ffffff;
+        border-color: #7c3aed;
+      }
+      .control-button.active:hover { background: #6d28d9; }
+      .challenge-panel {
+        display: none;
+        margin-bottom: 14px;
+        padding: 16px;
+        border-radius: 22px;
+        border: 1px solid #ddd6fe;
+        background: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 100%);
+      }
+      .challenge-grid {
+        display: grid;
+        grid-template-columns: 1fr 190px;
+        gap: 14px;
+        align-items: center;
+      }
+      .challenge-title {
+        margin: 0 0 8px;
+        font-size: 16px;
+        font-weight: 900;
+        color: #581c87;
+      }
+      .challenge-text {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.65;
+        color: #5b21b6;
+      }
+      .challenge-hint {
+        margin-top: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        border: 1px solid #ddd6fe;
+        background: #ffffff;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6d28d9;
+      }
+      .challenge-actions {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .mini-board-wrap {
+        border-radius: 20px;
+        border: 1px solid #e9d5ff;
+        background: #ffffff;
+        padding: 10px;
+        box-shadow: 0 4px 12px rgba(91,33,182,0.08);
+      }
+      .mini-board-wrap svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .mini-board-title {
+        margin-bottom: 8px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-weight: 900;
+        color: #7c3aed;
+      }
+      .board-wrap {
+        position: relative;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        border-radius: 30px;
+        border: 1px solid #cbd5e1;
+        background: linear-gradient(180deg, #f1f5f9 0%, #dbe4ef 100%);
+        padding: 12px;
+        overflow: hidden;
+      }
+      .mesa {
+        display: block;
+        width: 100%;
+        aspect-ratio: 3 / 2;
+        border-radius: 22px;
+        background: #ffffff;
+        border: 1px solid #dbe4ef;
+        box-shadow: 0 4px 14px rgba(15,23,42,0.05);
+        cursor: crosshair;
+        touch-action: none;
+      }
+      .legend-row {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 12px;
+        color: #64748b;
+      }
+      .legend-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+      }
+      .legend-dot { width: 10px; height: 10px; border-radius: 999px; flex: 0 0 auto; }
+      .legend-dash { width: 18px; height: 0; border-top: 3px dashed #7c3aed; flex: 0 0 auto; }
+      .graph-shell {
+        border-radius: 26px;
+        border: 1px solid #dbe4ef;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        padding: 14px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+      }
+      .graph-meta {
+        margin-bottom: 10px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #475569;
+      }
+      .graph-box {
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        min-height: 280px;
+        overflow: hidden;
+      }
+      .graph-box svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .formula-box {
+        margin-top: 14px;
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        padding: 14px 16px;
+      }
+      .formula-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-weight: 900;
+        color: #64748b;
+        margin-bottom: 8px;
+      }
+      .formula-line {
+        font-size: 13px;
+        line-height: 1.65;
+        color: #475569;
+        margin: 0 0 6px;
+      }
+      .formula-math {
+        font-family: Georgia, Cambria, Times New Roman, serif;
+        font-style: italic;
+        font-size: 16px;
+        color: #0f172a;
+        margin: 6px 0;
+        padding: 8px 12px;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+      .success-card { margin-top: 16px; padding: 16px 18px; }
+      .success-card.gold {
+        border: 1px solid #f5d76e;
+        background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+        color: #92400e;
+      }
+      .success-card.silver {
+        border: 1px solid #cbd5e1;
+        background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+        color: #334155;
+      }
+      .success-card.bronze {
+        border: 1px solid #d6b08a;
+        background: linear-gradient(180deg, #fff7ed 0%, #f7e3d2 100%);
+        color: #7c2d12;
+      }
+      .success-card.note {
+        border: 1px solid #99f6e4;
+        background: linear-gradient(180deg, #f0fdfa 0%, #ccfbf1 100%);
+        color: #134e4a;
+      }
+      .success-card.fail {
+        border: 1px solid #fecaca;
+        background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
+        color: #9f1239;
+      }
+      .success-title {
+        margin: 0 0 6px;
+        font-size: 20px;
+        font-weight: 900;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .cup-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        font-size: 20px;
+        box-shadow: 0 6px 18px rgba(15,23,42,0.10);
+        background: rgba(255,255,255,0.78);
+      }
+      .cup-icon.gold { color: #d97706; }
+      .cup-icon.silver { color: #94a3b8; }
+      .cup-icon.bronze { color: #b45309; }
+      .cup-icon.fail { color: #e11d48; }
+      .cup-icon.note { color: #0f766e; }
+      .success-text {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .jug-controls {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr auto;
+        gap: 12px;
+        align-items: end;
+        margin-bottom: 12px;
+      }
+      .ss-field {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 14px;
+        padding: 12px 14px;
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: 0.22em;
+        color: #0f172a;
+        background: #ffffff;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .range-row { display: flex; align-items: center; gap: 10px; }
+      .range-row input[type=range] { width: 100%; accent-color: #7c3aed; }
+      .range-value { min-width: 44px; text-align: right; font-weight: 900; font-size: 14px; }
+      .preset-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+      .preset-chip {
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        border-radius: 999px;
+        padding: 7px 12px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #475569;
+        cursor: pointer;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        transition: background 120ms ease, transform 120ms ease;
+      }
+      .preset-chip:hover { background: #f5f3ff; transform: translateY(-1px); }
+      .beat-ticker { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+      .beat-chip {
+        min-width: 34px;
+        text-align: center;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 7px 8px;
+        font-size: 16px;
+        font-weight: 900;
+        color: #334155;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        transition: background 90ms ease, color 90ms ease, transform 90ms ease;
+      }
+      .beat-chip.active { background: #7c3aed; border-color: #7c3aed; color: #ffffff; transform: translateY(-2px) scale(1.06); }
+      .sub-section { margin-top: 16px; }
+      .explorer-card {
+        margin-top: 14px;
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        padding: 14px 16px;
+      }
+      .explorer-title { margin: 0 0 8px; font-size: 14px; font-weight: 900; color: #0f172a; }
+      .explorer-state { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+      .slot {
+        width: 26px;
+        height: 26px;
+        border-radius: 9px;
+        border: 1.5px solid #cbd5e1;
+        background: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .slot.on { background: #7c3aed; border-color: #7c3aed; }
+      .slot-n { font-size: 11px; font-weight: 900; color: #94a3b8; }
+      .slot.on .slot-n { color: #ffffff; }
+      .slot-cap { margin-left: 6px; font-size: 12px; color: #64748b; font-weight: 700; }
+      .explorer-throws { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+      .throw-btn {
+        min-width: 38px;
+        border: 1.5px solid #7c3aed;
+        background: #ffffff;
+        color: #6d28d9;
+        border-radius: 12px;
+        padding: 8px 10px;
+        font-size: 15px;
+        font-weight: 900;
+        cursor: pointer;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        transition: background 100ms ease, color 100ms ease, transform 100ms ease;
+      }
+      .throw-btn:hover { background: #7c3aed; color: #ffffff; transform: translateY(-1px); }
+      .explorer-seq-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+      .explorer-seq-label { font-size: 12px; font-weight: 800; color: #64748b; }
+      .explorer-seq {
+        flex: 1 1 auto;
+        min-width: 120px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 12px;
+        padding: 8px 12px;
+        font-size: 17px;
+        font-weight: 900;
+        letter-spacing: 0.2em;
+        color: #0f172a;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .explorer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      .explorer-note {
+        margin-top: 10px;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        padding: 10px 12px;
+        font-size: 12.5px;
+        line-height: 1.6;
+        color: #475569;
+      }
+      .explorer-note.ok { border-color: #99f6e4; background: #f0fdfa; color: #134e4a; font-weight: 700; }
+      .small-btn { padding: 9px 13px; font-size: 13px; }
+
+      @media (max-width: 1060px) { .play-grid { grid-template-columns: 1fr; } }
+      @media (max-width: 950px) {
+        .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .controls-grid { grid-template-columns: 1fr; }
+        .jug-controls { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 760px) {
+        .app-shell { padding: 12px; }
+        .hero-card, .board-card, .graph-card { padding: 18px; border-radius: 24px; }
+        .board-wrap { padding: 8px; border-radius: 22px; }
+        .mesa { border-radius: 16px; }
+        .stat-value { font-size: 24px; }
+        .graph-box { min-height: 220px; }
+        .challenge-grid { grid-template-columns: 1fr; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .control-button, .slider-switch, .slider-switch:before { transition: none; }
+      }
+    ")),
+    tags$script(HTML("
+        document.addEventListener('DOMContentLoaded', function () {
+      const app = document.getElementById('juggle-app');
+      if (!app) return;
+
+      const els = {
+        input: document.getElementById('ss-input'),
+        presetRow: document.getElementById('preset-row'),
+        tempoRange: document.getElementById('tempo-range'),
+        tempoValue: document.getElementById('tempo-value'),
+        playBtn: document.getElementById('play-btn'),
+        canvasWrap: document.getElementById('canvas-wrap'),
+        canvas: document.getElementById('juggle-canvas'),
+        ticker: document.getElementById('beat-ticker'),
+        message: document.getElementById('message-box'),
+        statBalls: document.getElementById('stat-balls'),
+        statBallsSub: document.getElementById('stat-balls-sub'),
+        statPeriod: document.getElementById('stat-period'),
+        statPeriodSub: document.getElementById('stat-period-sub'),
+        statValid: document.getElementById('stat-valid'),
+        statValidSub: document.getElementById('stat-valid-sub'),
+        statCount: document.getElementById('stat-count'),
+        statCountSub: document.getElementById('stat-count-sub'),
+        permBox: document.getElementById('perm-box'),
+        permMeta: document.getElementById('perm-meta'),
+        graphBox: document.getElementById('graph-box'),
+        graphMeta: document.getElementById('graph-meta'),
+        ballsSelect: document.getElementById('balls-select'),
+        horizonSelect: document.getElementById('horizon-select'),
+        exState: document.getElementById('explorer-state'),
+        exThrows: document.getElementById('explorer-throws'),
+        exSeq: document.getElementById('explorer-seq'),
+        exUndo: document.getElementById('explorer-undo'),
+        exReset: document.getElementById('explorer-reset'),
+        exLoad: document.getElementById('explorer-load'),
+        exNote: document.getElementById('explorer-note')
+      };
+
+      const W = 720;
+      const H = 480;
+      const FLOOR = 42;          // altura del suelo sobre el borde inferior (coordenadas lógicas, y hacia arriba)
+      const HAND_Y = FLOOR + 26; // altura de las manos
+      const INNER_X = 46;        // las manos lanzan desde dentro...
+      const OUTER_X = 128;       // ...y atrapan por fuera (barrido clásico)
+      const DWELL = 0.55;        // fracción del tiempo (en beats) que la pelota pasa en la mano antes del siguiente lanzamiento
+      const BALL_R = 11;
+      const BALL_COLORS = ['#7c3aed', '#0d9488', '#f59e0b', '#e11d48', '#0284c7', '#65a30d', '#4338ca', '#ea580c'];
+
+      const state = {
+        text: '3',
+        analysis: null,     // resultado de analyze()
+        sim: null,          // eventos y calibracion de la animacion
+        playing: true,
+        tempo: 4,           // beats por segundo
+        time: 0,            // tiempo de animacion en beats, dentro de [0, loopP)
+        lastFrame: null,
+        raf: null,
+        scale: 1,
+        gBalls: 3,          // grafo: pelotas
+        gHorizon: 5,        // grafo: lanzamiento maximo m
+        exState: 0,         // explorador: estado actual (bits 1..m)
+        exSeq: []
+      };
+
+      // ---------- utilidades ----------
+      function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+      function groupDigits(s) {
+        let out = '';
+        let c = 0;
+        for (let i = s.length - 1; i >= 0; i -= 1) {
+          out = s[i] + out;
+          c += 1;
+          if (c % 3 === 0 && i > 0) out = ' ' + out;
+        }
+        return out;
+      }
+      function charToVal(ch) {
+        if (ch >= '0' && ch <= '9') return ch.charCodeAt(0) - 48;
+        if (ch >= 'a' && ch <= 'z') return ch.charCodeAt(0) - 87;   // a = 10, b = 11, ...
+        return -1;
+      }
+      function valToChar(v) { return v < 10 ? String(v) : String.fromCharCode(87 + v); }
+
+      // ---------- analisis del siteswap ----------
+      function analyze(raw) {
+        const text = raw.toLowerCase().replace(/[ ,.]/g, '');
+        if (!text.length) return { ok: false, error: 'Escribe una sucesión de lanzamientos: dígitos 0–9 y letras a–z (a = 10, b = 11…).' };
+        const values = [];
+        for (let i = 0; i < text.length; i += 1) {
+          const v = charToVal(text[i]);
+          if (v < 0) return { ok: false, error: `No entiendo el símbolo «${text[i]}»: usa dígitos 0–9 o letras a–z (a = 10, b = 11…).` };
+          values.push(v);
+        }
+        const n = values.length;
+        const sum = values.reduce(function (a, b) { return a + b; }, 0);
+        const avgNum = sum / n;
+        const landings = values.map(function (a, i) { return (i + a) % n; });
+        const hit = new Array(n).fill(-1);
+        const collisions = [];
+        landings.forEach(function (L, i) {
+          if (hit[L] >= 0) collisions.push([hit[L], i, L]); else hit[L] = i;
+        });
+        const valid = collisions.length === 0;
+        const balls = valid ? sum / n : null;
+        // ciclos de la permutacion (orbitas de los beats)
+        let cycles = [];
+        if (valid) {
+          const seen = new Array(n).fill(false);
+          for (let i = 0; i < n; i += 1) {
+            if (seen[i]) continue;
+            const cyc = [];
+            let j = i;
+            while (!seen[j]) { seen[j] = true; cyc.push(j); j = landings[j]; }
+            cycles.push(cyc);
+          }
+        }
+        return {
+          ok: true,
+          text: text,
+          values: values,
+          n: n,
+          sum: sum,
+          avg: avgNum,
+          avgInt: Number.isInteger(avgNum),
+          landings: landings,
+          collisions: collisions,
+          valid: valid,
+          balls: balls,
+          maxThrow: Math.max.apply(null, values),
+          cycles: cycles
+        };
+      }
+      function begwCount(n, b) {
+        // Buhler–Eisenbud–Graham–Wright (1994): (b+1)^n − b^n sucesiones de periodo n con b pelotas
+        const bb = BigInt(b);
+        const nn = BigInt(n);
+        function pow(base, exp) { let r = 1n; for (let k = 0n; k < exp; k += 1n) r *= base; return r; }
+        return pow(bb + 1n, nn) - pow(bb, nn);
+      }
+
+      // ---------- simulacion: eventos de lanzamiento con identidad de pelota ----------
+      function buildSim(an) {
+        if (!an || !an.valid || an.balls === 0) return { events: [], loopP: 2, T0: 0, G: 60, balls: 0, states: [] };
+        const n = an.n;
+        const values = an.values;
+        // periodo del bucle visual: los colores se repiten cuando cada ciclo de la permutacion completa su rotacion.
+        // Un ciclo C lleva k_C = (suma de sus lanzamientos)/n pelotas que van turnandose: su periodo es n*k_C beats.
+        // El bucle correcto es lcm(2, n*k_C) sobre todos los ciclos (el 2 respeta la alternancia de manos).
+        function gcd2(x, y) { while (y) { const z = x % y; x = y; y = z; } return x; }
+        let loopP = 2;
+        an.cycles.forEach(function (cyc) {
+          const s = cyc.reduce(function (acc, i) { return acc + values[i]; }, 0);
+          const kC = Math.round(s / n);
+          if (kC > 0) { const p = n * kC; loopP = loopP * p / gcd2(loopP, p); }
+        });
+        if (loopP > 600) loopP = (n % 2 === 0) ? n : 2 * n;   // salvaguarda para patrones patologicos
+        const maxA = Math.max(2, an.maxThrow);
+        const warm = 40 + maxA * 3;
+        const T0 = Math.ceil(warm / loopP) * loopP;
+        const span = T0 + loopP + 1;
+        const incoming = {};
+        let nextId = 0;
+        const events = [];
+        for (let t = 0; t < span; t += 1) {
+          const a = values[t % n];
+          let ball = -1;
+          if (Object.prototype.hasOwnProperty.call(incoming, t)) { ball = incoming[t]; delete incoming[t]; }
+          if (a > 0) {
+            if (ball < 0) ball = nextId++;
+            incoming[t + a] = ball;
+            if (t + a > T0 - maxA - 1 && t < T0 + loopP) {
+              events.push({ t: t, a: a, ball: ball, from: t % 2, to: (t + a) % 2 });
+            }
+          }
+        }
+        // estado antes de cada beat del periodo: calendario de las pelotas ya lanzadas (en vuelo o aterrizando ahora)
+        const states = [];
+        for (let k = 0; k < n; k += 1) {
+          const t = T0 + k;
+          let mask = 0;
+          events.forEach(function (e) {
+            if (e.t < t && e.t + e.a >= t) {
+              const d = e.t + e.a - t + 1;   // bit 1 = aterriza ahora mismo
+              if (d <= maxA) mask |= (1 << d);
+            }
+          });
+          states.push(mask);
+        }
+        // gravedad calibrada: el lanzamiento mas alto llega al 78% del lienzo
+        const Tmax = Math.max(0.6, an.maxThrow - DWELL);
+        const G = 8 * (H - HAND_Y - 66) / (Tmax * Tmax);
+        return { events: events, loopP: loopP, T0: T0, G: G, balls: an.balls, states: states, maxA: maxA };
+      }
+
+      function handPos(hand, time) {
+        // la mano lanza en los beats t ≡ hand (mod 2): ciclo de 2 beats, dentro→fuera vacía y fuera→dentro cargando
+        const side = hand === 0 ? 1 : -1;
+        let phi = (time - hand) % 2;
+        if (phi < 0) phi += 2;
+        const carry = phi > 2 - DWELL;
+        const u = carry ? (phi - (2 - DWELL)) / DWELL : phi / (2 - DWELL);
+        const x0 = carry ? OUTER_X : INNER_X;
+        const x1 = carry ? INNER_X : OUTER_X;
+        const x = side * (x0 + (x1 - x0) * u);
+        const y = HAND_Y + (carry ? 8 * Math.sin(Math.PI * u) : 3 * Math.sin(Math.PI * u));
+        return { x: W / 2 + x, y: y, carry: carry };
+      }
+
+      function ballPositions(time) {
+        const sim = state.sim;
+        const out = [];
+        if (!sim || !sim.events.length) return out;
+        const abs = sim.T0 + (time % sim.loopP);
+        sim.events.forEach(function (e) {
+          if (abs < e.t || abs >= e.t + e.a) return;
+          const local = abs - e.t;
+          if (e.a === 2) {
+            const hp = handPos(e.from, abs);
+            out.push({ ball: e.ball, x: hp.x, y: hp.y + 4, held: true });
+            return;
+          }
+          const flight = e.a - DWELL;
+          const sideFrom = e.from === 0 ? 1 : -1;
+          const sideTo = e.to === 0 ? 1 : -1;
+          const x1 = W / 2 + sideFrom * INNER_X;
+          const x2 = W / 2 + sideTo * OUTER_X;
+          if (local < flight) {
+            const u = local / flight;
+            const hmax = sim.G * flight * flight / 8;
+            out.push({ ball: e.ball, x: x1 + (x2 - x1) * u, y: HAND_Y + 6 + hmax * 4 * u * (1 - u), held: false, a: e.a, u: u });
+          } else {
+            const hp = handPos(e.to, abs);
+            out.push({ ball: e.ball, x: hp.x, y: hp.y + 4, held: true });
+          }
+        });
+        return out;
+      }
+
+      // ---------- lienzo ----------
+      function resizeCanvas() {
+        const canvas = els.canvas;
+        const rect = canvas.getBoundingClientRect();
+        const cssW = rect.width || W;
+        const cssH = cssW * H / W;
+        canvas.style.height = cssH + 'px';
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.max(1, Math.round(cssW * dpr));
+        const h = Math.max(1, Math.round(cssH * dpr));
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+        state.scale = w / W;
+      }
+      function sy(y) { return H - y; }
+
+      function drawCanvas() {
+        const ctx = els.canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(state.scale, 0, 0, state.scale, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+        // suelo
+        ctx.strokeStyle = 'rgba(15,23,42,0.14)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(24, sy(FLOOR));
+        ctx.lineTo(W - 24, sy(FLOOR));
+        ctx.stroke();
+        const an = state.analysis;
+        if (!an || !an.ok || !an.valid) {
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '700 15px Inter, ui-sans-serif, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(an && an.ok ? 'Este siteswap no es malabareable: mira las colisiones en el diagrama' : 'Escribe un siteswap para animarlo', W / 2, sy(H / 2));
+          drawHands(ctx, state.time);
+          return;
+        }
+        if (an.balls === 0) {
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '700 15px Inter, ui-sans-serif, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('Cero pelotas: el patrón vacío también es válido (y aburrido)', W / 2, sy(H / 2));
+          drawHands(ctx, state.time);
+          return;
+        }
+        // etiqueta del lanzamiento del beat actual, junto a la mano que lanza
+        const beatAbs = Math.floor(state.time);
+        const a = an.values[((beatAbs % an.n) + an.n) % an.n];
+        const hand = beatAbs % 2;
+        const frac = state.time - beatAbs;
+        if (a > 0 && frac < 0.5) {
+          const side = hand === 0 ? 1 : -1;
+          ctx.fillStyle = 'rgba(124,58,237,' + (0.85 * (1 - frac * 2)).toFixed(2) + ')';
+          ctx.font = '900 26px Inter, ui-sans-serif, system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(valToChar(a), W / 2 + side * INNER_X, sy(HAND_Y + 52));
+        }
+        drawHands(ctx, state.time);
+        const balls = ballPositions(state.time);
+        balls.sort(function (p, q) { return q.y - p.y; });
+        balls.forEach(function (b) {
+          const col = BALL_COLORS[b.ball % BALL_COLORS.length];
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(b.x, sy(b.y) + 3, BALL_R * 0.92, 0, 2 * Math.PI);
+          ctx.fillStyle = 'rgba(15,23,42,0.10)';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(b.x, sy(b.y), BALL_R, 0, 2 * Math.PI);
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(b.x - 3.5, sy(b.y) - 3.5, BALL_R * 0.34, 0, 2 * Math.PI);
+          ctx.fillStyle = 'rgba(255,255,255,0.55)';
+          ctx.fill();
+          ctx.restore();
+        });
+        // contador de beat
+        ctx.fillStyle = '#64748b';
+        ctx.font = '700 11px Inter, ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('beat ' + (beatAbs % an.n) + ' de ' + an.n + ' · mano ' + (hand === 0 ? 'derecha' : 'izquierda') + ' · ' + state.tempo.toFixed(1) + ' beats/s', 24, sy(FLOOR) + 18);
+        ctx.textAlign = 'right';
+        ctx.fillText('altura ∝ (tiempo de vuelo)²: subir un número cuesta cada vez más', W - 24, sy(FLOOR) + 18);
+      }
+      function drawHands(ctx, time) {
+        [0, 1].forEach(function (h) {
+          const hp = handPos(h, time);
+          ctx.save();
+          ctx.strokeStyle = hp.carry ? '#0f172a' : '#475569';
+          ctx.lineWidth = 6;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.arc(hp.x, sy(hp.y) + 6, 17, Math.PI * 0.12, Math.PI * 0.88, false);
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
+
+      // ---------- animacion ----------
+      function frame(now) {
+        state.raf = null;
+        if (state.lastFrame === null) state.lastFrame = now;
+        const dt = Math.min(0.08, (now - state.lastFrame) / 1000);
+        state.lastFrame = now;
+        if (state.playing) {
+          const P = state.sim ? state.sim.loopP : 2;
+          state.time = (state.time + dt * state.tempo) % P;
+          drawCanvas();
+          updateTicker();
+        }
+        state.raf = window.requestAnimationFrame(frame);
+      }
+      function updateTicker() {
+        const an = state.analysis;
+        if (!an || !an.ok) return;
+        const idx = Math.floor(state.time) % an.n;
+        const chips = els.ticker.children;
+        for (let i = 0; i < chips.length; i += 1) chips[i].classList.toggle('active', i === idx);
+      }
+      function renderTicker() {
+        const an = state.analysis;
+        if (!an || !an.ok) { els.ticker.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 0; i < an.n; i += 1) {
+          html += `<span class='beat-chip'>${valToChar(an.values[i])}</span>`;
+        }
+        els.ticker.innerHTML = html;
+      }
+
+      // ---------- diagrama de aterrizajes (la prueba de la permutacion, en circulo) ----------
+      function renderPerm() {
+        const an = state.analysis;
+        const width = 480;
+        const height = 340;
+        if (!an || !an.ok) {
+          els.permBox.innerHTML = `<svg viewBox='0 0 ${width} ${height}'><rect width='100%' height='100%' fill='#ffffff'></rect><text x='${width / 2}' y='${height / 2}' text-anchor='middle' font-size='13' font-weight='700' fill='#94a3b8' font-family='Inter, sans-serif'>El diagrama aparecerá con un siteswap válido de leer</text></svg>`;
+          els.permMeta.innerHTML = an ? an.error : '';
+          return;
+        }
+        const n = an.n;
+        const cx = width / 2;
+        const cy = height / 2 + 4;
+        const R = Math.min(width, height) / 2 - 52;
+        const pos = [];
+        for (let i = 0; i < n; i += 1) {
+          const th = -Math.PI / 2 + 2 * Math.PI * i / n;
+          pos.push({ x: cx + R * Math.cos(th), y: cy + R * Math.sin(th) });
+        }
+        const collided = {};
+        an.collisions.forEach(function (c) { collided[c[2]] = true; });
+        const parts = [];
+        parts.push(`<svg viewBox='0 0 ${width} ${height}' aria-label='Prueba de la permutación'>`);
+        parts.push(`<rect width='100%' height='100%' fill='#ffffff'></rect>`);
+        parts.push(`<defs><marker id='arr' viewBox='0 0 8 8' refX='7' refY='4' markerWidth='7' markerHeight='7' orient='auto-start-reverse'><path d='M0,0 L8,4 L0,8 z' fill='context-stroke'></path></marker></defs>`);
+        // cuerdas i -> (i + a_i) mod n
+        for (let i = 0; i < n; i += 1) {
+          const j = an.landings[i];
+          const bad = collided[j];
+          const col = bad ? '#e11d48' : (an.values[i] === 0 ? '#cbd5e1' : '#7c3aed');
+          if (i === j) {
+            const th = -Math.PI / 2 + 2 * Math.PI * i / n;
+            const lx = cx + (R + 22) * Math.cos(th);
+            const ly = cy + (R + 22) * Math.sin(th);
+            parts.push(`<circle cx='${lx.toFixed(1)}' cy='${ly.toFixed(1)}' r='11' fill='none' stroke='${col}' stroke-width='2'></circle>`);
+            continue;
+          }
+          const mx = (pos[i].x + pos[j].x) / 2;
+          const my = (pos[i].y + pos[j].y) / 2;
+          const qx = mx + (cx - mx) * 0.55;
+          const qy = my + (cy - my) * 0.55;
+          const dx = pos[j].x - qx;
+          const dy = pos[j].y - qy;
+          const dd = Math.hypot(dx, dy) || 1;
+          const ex = pos[j].x - dx / dd * 13;
+          const ey = pos[j].y - dy / dd * 13;
+          parts.push(`<path d='M ${pos[i].x.toFixed(1)} ${pos[i].y.toFixed(1)} Q ${qx.toFixed(1)} ${qy.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}' fill='none' stroke='${col}' stroke-width='2.2' opacity='0.85' marker-end='url(#arr)'></path>`);
+        }
+        for (let i = 0; i < n; i += 1) {
+          const bad = collided[i];
+          parts.push(`<circle cx='${pos[i].x.toFixed(1)}' cy='${pos[i].y.toFixed(1)}' r='13' fill='${bad ? '#e11d48' : '#0f172a'}'></circle>`);
+          parts.push(`<text x='${pos[i].x.toFixed(1)}' y='${(pos[i].y + 4).toFixed(1)}' text-anchor='middle' font-size='12' font-weight='800' fill='#ffffff' font-family='Inter, sans-serif'>${i}</text>`);
+          const th = -Math.PI / 2 + 2 * Math.PI * i / n;
+          parts.push(`<text x='${(cx + (R + 30) * Math.cos(th)).toFixed(1)}' y='${(cy + (R + 30) * Math.sin(th) + 4).toFixed(1)}' text-anchor='middle' font-size='12' font-weight='800' fill='#7c3aed' font-family='Inter, sans-serif'>${valToChar(an.values[i])}</text>`);
+        }
+        parts.push(`</svg>`);
+        els.permBox.innerHTML = parts.join('');
+
+        const sumTxt = an.values.map(valToChar).join(' + ');
+        let meta = `Teorema del promedio: (${sumTxt}) / ${n} = <strong>${an.avgInt ? an.avg : an.sum + '/' + n}</strong>`;
+        meta += an.avgInt ? ' pelotas: media entera ✓.' : ': la media <strong>no es entera</strong>, así que no existe patrón con esta sucesión ✗.';
+        if (an.avgInt && !an.valid) {
+          const c = an.collisions[0];
+          meta += ` Pero la media entera no basta: los beats <strong>${c[0]}</strong> y <strong>${c[1]}</strong> aterrizan a la vez en el tiempo <strong>${c[2]}</strong> (mod ${n}), y i ↦ i + aᵢ no es permutación ✗.`;
+        }
+        if (an.valid) {
+          meta += ` La aplicación i ↦ i + aᵢ (mod ${n}) es una permutación ✓ con ${an.cycles.length} ciclo${an.cycles.length === 1 ? '' : 's'}: ` + an.cycles.map(function (c) { return '(' + c.join(' ') + ')'; }).join(' ') + '.';
+        }
+        els.permMeta.innerHTML = meta;
+      }
+
+      // ---------- tarjetas de arriba ----------
+      function renderStats() {
+        const an = state.analysis;
+        if (!an || !an.ok) {
+          els.statBalls.textContent = '—';
+          els.statBallsSub.textContent = 'b = (a₁ + ⋯ + aₙ) / n';
+          els.statPeriod.textContent = '—';
+          els.statPeriodSub.textContent = 'longitud de la sucesión';
+          els.statValid.textContent = '—';
+          els.statValidSub.textContent = 'i ↦ i + aᵢ (mod n) debe ser permutación';
+          els.statCount.textContent = '—';
+          els.statCountSub.textContent = '(b+1)ⁿ − bⁿ · Buhler–Eisenbud–Graham–Wright (1994)';
+          return;
+        }
+        els.statBalls.textContent = an.avgInt ? String(an.avg) : an.sum + '/' + an.n;
+        els.statBallsSub.textContent = an.avgInt ? 'teorema del promedio: la media de la sucesión' : 'la media no es entera: no hay patrón posible';
+        els.statPeriod.textContent = String(an.n);
+        els.statPeriodSub.textContent = 'beats por ciclo · las manos alternan derecha–izquierda';
+        els.statValid.textContent = an.valid ? '✓ sí' : '✗ no';
+        els.statValidSub.textContent = an.valid ? 'i ↦ i + aᵢ (mod n) es permutación: nunca caen dos a la vez' : (an.avgInt ? 'dos pelotas aterrizan en el mismo beat' : 'media no entera');
+        if (an.avgInt && an.balls !== null) {
+          els.statCount.textContent = groupDigits(begwCount(an.n, an.balls).toString());
+          els.statCountSub.textContent = `(${an.balls}+1)^${an.n} − ${an.balls}^${an.n} sucesiones de período ${an.n} con ${an.balls} pelotas (BEGW 1994)`;
+        } else if (an.avgInt) {
+          els.statCount.textContent = groupDigits(begwCount(an.n, Math.round(an.avg)).toString());
+          els.statCountSub.textContent = `(b+1)ⁿ − bⁿ con b = ${Math.round(an.avg)}, n = ${an.n} (BEGW 1994)`;
+        } else {
+          els.statCount.textContent = '—';
+          els.statCountSub.textContent = '(b+1)ⁿ − bⁿ · Buhler–Eisenbud–Graham–Wright (1994)';
+        }
+      }
+
+      function statusMessage() {
+        const an = state.analysis;
+        if (!an || !an.ok) return an ? an.error : '';
+        if (!an.avgInt) return `«${an.text}» suma ${an.sum} en ${an.n} beats: media ${an.sum}/${an.n}, no entera. El teorema del promedio dice que el número de pelotas es la media, así que este patrón no existe. Prueba quitando o cambiando un lanzamiento.`;
+        if (!an.valid) {
+          const c = an.collisions[0];
+          return `«${an.text}» tiene media entera (${an.avg} pelotas), pero los lanzamientos de los beats ${c[0]} y ${c[1]} caerían a la vez en el beat ${c[2]}: el recíproco del teorema del promedio es falso, como en 432. Mira las flechas rojas del diagrama.`;
+        }
+        if (an.balls === 0) return 'El patrón vacío: válido, con cero pelotas. Los teoremas también cuentan los casos triviales.';
+        const cross = an.values.filter(function (v) { return v % 2 === 1; }).length;
+        return `«${an.text}»: ${an.balls} pelota${an.balls === 1 ? '' : 's'}, período ${an.n}. Los lanzamientos impares cruzan de mano y los pares vuelven a la misma (${cross} de ${an.n} cruzan). Cada pelota sigue los ciclos de la permutación del diagrama; abajo a la derecha, el grafo de estados recorre este patrón como un ciclo.`;
+      }
+
+      // ---------- grafo de estados: subconjuntos de b aterrizajes entre {1..m} ----------
+      function comb(m, b) { let r = 1; for (let i = 0; i < b; i += 1) r = r * (m - i) / (i + 1); return Math.round(r); }
+      function stateList(b, m) {
+        const out = [];
+        const total = 1 << m;
+        for (let mask = 0; mask < total; mask += 1) {
+          let c = 0;
+          for (let i = 0; i < m; i += 1) if (mask & (1 << i)) c += 1;
+          if (c === b) out.push(mask << 1);   // bits 1..m
+        }
+        return out;
+      }
+      function bitCount(x) { let c = 0; while (x) { c += x & 1; x >>= 1; } return c; }
+      function throwFrom(mask, a, m) {
+        // devuelve el estado tras lanzar a (o null si es ilegal)
+        if (!(mask & 2)) return a === 0 ? (mask >> 1) : null;          // sin pelota ahora: solo el beat vacío 0
+        if (a < 1 || a > m) return null;
+        const rest = (mask & ~2) >> 1;
+        if (rest & (1 << a)) return null;                              // ese hueco ya está ocupado
+        return rest | (1 << a);
+      }
+      function legalThrows(mask, m) {
+        const out = [];
+        for (let a = 0; a <= m; a += 1) if (throwFrom(mask, a, m) !== null) out.push(a);
+        return out;
+      }
+      function groundState(b) { let s = 0; for (let i = 1; i <= b; i += 1) s |= (1 << i); return s; }
+      function maskDots(mask, m) {
+        let s = '';
+        for (let i = 1; i <= m; i += 1) s += (mask & (1 << i)) ? '●' : '○';
+        return s;
+      }
+
+      function patternOrbit(b, m) {
+        // estados y aristas que recorre el patrón actual, si cabe en este grafo
+        const an = state.analysis;
+        const sim = state.sim;
+        if (!an || !an.valid || an.balls !== b || an.maxThrow > m || !sim || !sim.states.length) return null;
+        const nodes = {};
+        const edges = {};
+        for (let k = 0; k < an.n; k += 1) {
+          const s = sim.states[k];
+          const s2 = sim.states[(k + 1) % an.n];
+          nodes[s] = true;
+          edges[s + '|' + an.values[k]] = true;
+          if (throwFrom(s, an.values[k], m) !== s2) return null;   // no debería pasar; por si acaso
+        }
+        return { nodes: nodes, edges: edges };
+      }
+
+      function renderGraph() {
+        const b = state.gBalls;
+        const m = state.gHorizon;
+        const width = 480;
+        const height = 430;
+        const nodes = stateList(b, m);
+        const orbit = patternOrbit(b, m);
+        const idx = {};
+        nodes.forEach(function (s, i) { idx[s] = i; });
+        const cx = width / 2;
+        const cy = height / 2;
+        const R = Math.min(width, height) / 2 - 46;
+        const P = {};
+        nodes.forEach(function (s, i) {
+          const th = -Math.PI / 2 + 2 * Math.PI * i / nodes.length;
+          P[s] = { x: cx + R * Math.cos(th), y: cy + R * Math.sin(th), th: th };
+        });
+        const parts = [];
+        parts.push(`<svg viewBox='0 0 ${width} ${height}' aria-label='Grafo de estados'>`);
+        parts.push(`<rect width='100%' height='100%' fill='#ffffff'></rect>`);
+        parts.push(`<defs><marker id='garr' viewBox='0 0 8 8' refX='7' refY='4' markerWidth='6.4' markerHeight='6.4' orient='auto-start-reverse'><path d='M0,0 L8,4 L0,8 z' fill='context-stroke'></path></marker></defs>`);
+        nodes.forEach(function (s) {
+          legalThrows(s, m).forEach(function (a) {
+            const t = throwFrom(s, a, m);
+            const hi = orbit && orbit.edges[s + '|' + a];
+            const col = hi ? '#7c3aed' : 'rgba(100,116,139,0.4)';
+            const wdt = hi ? 2.6 : 1.3;
+            if (t === s) {
+              const lx = cx + (R + 26) * Math.cos(P[s].th);
+              const ly = cy + (R + 26) * Math.sin(P[s].th);
+              parts.push(`<circle cx='${lx.toFixed(1)}' cy='${ly.toFixed(1)}' r='10' fill='none' stroke='${col}' stroke-width='${wdt}'></circle>`);
+              parts.push(`<text x='${lx.toFixed(1)}' y='${(ly + 3.4).toFixed(1)}' text-anchor='middle' font-size='10' font-weight='900' fill='${hi ? '#7c3aed' : '#64748b'}' font-family='Inter, sans-serif'>${valToChar(a)}</text>`);
+              return;
+            }
+            const q = P[t];
+            const p = P[s];
+            const mx = (p.x + q.x) / 2;
+            const my = (p.y + q.y) / 2;
+            const bend = 0.24 + 0.1 * ((a * 7 + s) % 3);
+            const qx = mx + (cx - mx) * bend;
+            const qy = my + (cy - my) * bend;
+            const dx = q.x - qx;
+            const dy = q.y - qy;
+            const dd = Math.hypot(dx, dy) || 1;
+            const ex = q.x - dx / dd * 26;
+            const ey = q.y - dy / dd * 26;
+            parts.push(`<path d='M ${p.x.toFixed(1)} ${p.y.toFixed(1)} Q ${qx.toFixed(1)} ${qy.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}' fill='none' stroke='${col}' stroke-width='${wdt}' marker-end='url(#garr)'></path>`);
+            if (hi || nodes.length <= 12) {
+              const tx = p.x * 0.3 + qx * 0.42 + q.x * 0.28;
+              const ty = p.y * 0.3 + qy * 0.42 + q.y * 0.28;
+              parts.push(`<text x='${tx.toFixed(1)}' y='${ty.toFixed(1)}' text-anchor='middle' font-size='10.5' font-weight='900' fill='${hi ? '#6d28d9' : '#94a3b8'}' paint-order='stroke' stroke='#ffffff' stroke-width='3' font-family='Inter, sans-serif'>${valToChar(a)}</text>`);
+            }
+          });
+        });
+        nodes.forEach(function (s) {
+          const p = P[s];
+          const inOrbit = orbit && orbit.nodes[s];
+          const isEx = state.exState === s;
+          const isGround = s === groundState(b);
+          const stroke = isEx ? '#0d9488' : (inOrbit ? '#7c3aed' : '#cbd5e1');
+          parts.push(`<rect x='${(p.x - 28).toFixed(1)}' y='${(p.y - 12).toFixed(1)}' width='56' height='24' rx='12' fill='${isGround ? '#f5f3ff' : '#ffffff'}' stroke='${stroke}' stroke-width='${isEx || inOrbit ? 2.6 : 1.3}'></rect>`);
+          parts.push(`<text x='${p.x.toFixed(1)}' y='${(p.y + 3.6).toFixed(1)}' text-anchor='middle' font-size='10.5' font-weight='800' fill='#0f172a' font-family='ui-monospace, monospace'>${maskDots(s, m)}</text>`);
+        });
+        parts.push(`</svg>`);
+        els.graphBox.innerHTML = parts.join('');
+
+        const an = state.analysis;
+        let meta = `Estados: aterrizajes programados en los próximos <strong>${m}</strong> beats (● ocupado, ○ libre): <strong>${nodes.length}</strong> = C(${m}, ${b}) nodos. Cada lanzamiento legal es una arista; cada siteswap, un ciclo.`;
+        if (orbit) meta += ` En violeta, el ciclo del patrón actual «<strong>${an.text}</strong>».`;
+        else if (an && an.valid && an.balls > 0) meta += an.balls !== b ? ` (El patrón actual usa ${an.balls} pelotas: cambia el selector para ver su ciclo.)` : ` (El patrón actual lanza hasta ${valToChar(an.maxThrow)}: sube el máximo m para ver su ciclo.)`;
+        els.graphMeta.innerHTML = meta;
+      }
+
+      // ---------- constructor: camina por el grafo y compone tu siteswap ----------
+      function renderExplorer() {
+        const m = state.gHorizon;
+        const b = state.gBalls;
+        const ground = groundState(b);
+        let html = '';
+        for (let i = 1; i <= m; i += 1) {
+          const on = state.exState & (1 << i);
+          html += `<span class='slot ${on ? 'on' : ''}'><span class='slot-n'>${i}</span></span>`;
+        }
+        els.exState.innerHTML = html + `<span class='slot-cap'>${state.exState === ground ? 'estado base' : 'aterrizajes futuros'}</span>`;
+        const legals = legalThrows(state.exState, m);
+        els.exThrows.innerHTML = legals.map(function (a) { return `<button class='throw-btn' data-a='${a}'>${valToChar(a)}</button>`; }).join('');
+        els.exSeq.textContent = state.exSeq.length ? state.exSeq.map(valToChar).join('') : '—';
+        const closed = state.exSeq.length > 0 && state.exState === ground;
+        els.exLoad.disabled = !closed;
+        els.exUndo.disabled = !state.exSeq.length;
+        if (closed) {
+          const seq = state.exSeq.map(valToChar).join('');
+          els.exNote.innerHTML = `¡Ciclo cerrado! Volviste al estado base: «<strong>${seq}</strong>» es un siteswap válido de ${b} pelotas por construcción. Cárgalo en el animador.`;
+          els.exNote.classList.add('ok');
+        } else {
+          els.exNote.innerHTML = state.exSeq.length
+            ? 'Sigue lanzando hasta volver al estado base (los ● en los primeros huecos): ahí tu camino se cierra en un ciclo = un siteswap válido.'
+            : `Empieza en el estado base de ${b} pelotas y elige lanzamientos legales: el grafo no te deja chocar pelotas, así que todo camino cerrado es un truco válido.`;
+          els.exNote.classList.remove('ok');
+        }
+      }
+      function exReset() {
+        state.exState = groundState(state.gBalls);
+        state.exSeq = [];
+        state.exHist = [];
+      }
+
+      // ---------- render conjunto ----------
+      function applyPattern(text) {
+        state.text = text;
+        state.analysis = analyze(text);
+        state.sim = buildSim(state.analysis);
+        state.time = 0;
+        els.input.value = text;
+        setMsg();
+        renderTicker();
+        renderStats();
+        renderPerm();
+        renderGraph();
+        renderExplorer();
+        drawCanvas();
+        updateTicker();
+      }
+      function setMsg() { els.message.textContent = statusMessage(); }
+
+      // ---------- interaccion ----------
+      els.input.addEventListener('input', function () {
+        state.text = this.value;
+        state.analysis = analyze(this.value);
+        state.sim = buildSim(state.analysis);
+        state.time = 0;
+        setMsg();
+        renderTicker();
+        renderStats();
+        renderPerm();
+        renderGraph();
+        drawCanvas();
+      });
+      els.presetRow.addEventListener('click', function (e) {
+        const btn = e.target.closest('button[data-ss]');
+        if (!btn) return;
+        applyPattern(btn.getAttribute('data-ss'));
+      });
+      els.tempoRange.addEventListener('input', function () {
+        state.tempo = parseFloat(this.value);
+        els.tempoValue.textContent = state.tempo.toFixed(1) + '×';
+      });
+      els.playBtn.addEventListener('click', function () {
+        state.playing = !state.playing;
+        this.innerHTML = state.playing ? '❚❚ Pausar' : '▶ Reproducir';
+      });
+      els.ballsSelect.addEventListener('change', function () {
+        state.gBalls = parseInt(this.value, 10);
+        if (state.gHorizon < state.gBalls) { state.gHorizon = state.gBalls; els.horizonSelect.value = String(state.gHorizon); }
+        exReset();
+        renderGraph();
+        renderExplorer();
+      });
+      els.horizonSelect.addEventListener('change', function () {
+        state.gHorizon = parseInt(this.value, 10);
+        if (state.gBalls > state.gHorizon) { state.gBalls = state.gHorizon; els.ballsSelect.value = String(state.gBalls); }
+        exReset();
+        renderGraph();
+        renderExplorer();
+      });
+      els.exThrows.addEventListener('click', function (e) {
+        const btn = e.target.closest('button[data-a]');
+        if (!btn) return;
+        const a = parseInt(btn.getAttribute('data-a'), 10);
+        const t = throwFrom(state.exState, a, state.gHorizon);
+        if (t === null) return;
+        state.exHist.push(state.exState);
+        state.exState = t;
+        state.exSeq.push(a);
+        renderGraph();
+        renderExplorer();
+      });
+      els.exUndo.addEventListener('click', function () {
+        if (!state.exSeq.length) return;
+        state.exSeq.pop();
+        state.exState = state.exHist.pop();
+        renderGraph();
+        renderExplorer();
+      });
+      els.exReset.addEventListener('click', function () {
+        exReset();
+        renderGraph();
+        renderExplorer();
+      });
+      els.exLoad.addEventListener('click', function () {
+        if (this.disabled) return;
+        applyPattern(state.exSeq.map(valToChar).join(''));
+      });
+
+      if (typeof window.ResizeObserver === 'function') {
+        new window.ResizeObserver(function () { resizeCanvas(); drawCanvas(); }).observe(els.canvasWrap);
+      } else {
+        window.addEventListener('resize', function () { resizeCanvas(); drawCanvas(); });
+      }
+
+      state.exHist = [];
+      exReset();
+      resizeCanvas();
+      applyPattern(state.text);
+      state.raf = window.requestAnimationFrame(frame);
+    });
+    "))
+  ),
+  tags$div(
+    id = "juggle-app",
+    class = "app-shell",
+    tags$div(
+      class = "hero-card",
+      tags$div(class = "badge", HTML("&#10022; Siteswap: la notación matemática de los malabares")),
+      tags$h1(class = "hero-title", "Malabares y matemáticas"),
+      tags$p(class = "hero-subtitle", "Cada truco de malabares periódico se escribe como una sucesión de enteros a₁a₂…aₙ: el lanzamiento del beat i vuelve a caer aᵢ beats después, alternando mano derecha e izquierda. Escribe un siteswap (o construye uno caminando por el grafo de estados) y mira los tres teoremas en acción: el número de pelotas es la media de la sucesión, el patrón existe si y solo si i ↦ i + aᵢ (mod n) es una permutación, y hay exactamente (b+1)ⁿ − bⁿ sucesiones de período n con b pelotas. Los lanzamientos impares cruzan de mano; los pares vuelven a la misma. La animación usa gravedad de verdad: la altura crece como el cuadrado del tiempo de vuelo."),
+      tags$div(
+        class = "stats-grid",
+        tags$div(class = "stat-card", tags$div(class = "stat-label", "Pelotas (teorema del promedio)"), tags$div(id = "stat-balls", class = "stat-value", "—"), tags$div(id = "stat-balls-sub", class = "stat-subvalue", "b = (a₁ + ⋯ + aₙ) / n")),
+        tags$div(class = "stat-card", tags$div(class = "stat-label", "Período n"), tags$div(id = "stat-period", class = "stat-value", "—"), tags$div(id = "stat-period-sub", class = "stat-subvalue", "longitud de la sucesión")),
+        tags$div(class = "stat-card", tags$div(class = "stat-label", "¿Malabareable?"), tags$div(id = "stat-valid", class = "stat-value", "—"), tags$div(id = "stat-valid-sub", class = "stat-subvalue", "i ↦ i + aᵢ (mod n) debe ser permutación")),
+        tags$div(class = "stat-card", tags$div(class = "stat-label", "Patrones de período n"), tags$div(id = "stat-count", class = "stat-value", "—"), tags$div(id = "stat-count-sub", class = "stat-subvalue", "(b+1)ⁿ − bⁿ · Buhler–Eisenbud–Graham–Wright (1994)"))
+      )
+    ),
+    tags$div(style = "height: 16px;"),
+    tags$div(
+      class = "play-grid",
+      tags$div(
+        class = "board-card",
+        tags$div(
+          class = "section-head",
+          tags$div(class = "section-icon", HTML("&#127923;")),
+          tags$div(tags$h2(class = "section-title", "El malabarista"), tags$p(class = "section-subtitle", "Escribe el siteswap con dígitos 0–9 y letras a–z (a = 10, b = 11…). El validador corre mientras escribes; si el patrón existe, se anima al instante. Cada pelota conserva su color, así puedes seguir los ciclos de la permutación con la vista."))
+        ),
+        tags$div(
+          class = "jug-controls",
+          tags$div(class = "control-box", tags$label(class = "control-label", `for` = "ss-input", "Siteswap"), tags$input(id = "ss-input", class = "ss-field", type = "text", value = "3", autocomplete = "off", spellcheck = "false")),
+          tags$div(class = "control-box", tags$label(class = "control-label", `for` = "tempo-range", "Tempo (beats por segundo)"), tags$div(class = "range-row", tags$input(id = "tempo-range", type = "range", min = "1.5", max = "8", step = "0.1", value = "4"), tags$span(id = "tempo-value", class = "range-value", "4.0×"))),
+          tags$button(id = "play-btn", class = "control-button", HTML("&#10074;&#10074; Pausar"))
+        ),
+        tags$div(
+          id = "preset-row",
+          class = "preset-row",
+          tags$button(class = "preset-chip", `data-ss` = "3", "3 · cascada"),
+          tags$button(class = "preset-chip", `data-ss` = "51", "51 · ducha"),
+          tags$button(class = "preset-chip", `data-ss` = "441", "441"),
+          tags$button(class = "preset-chip", `data-ss` = "531", "531"),
+          tags$button(class = "preset-chip", `data-ss` = "423", "423"),
+          tags$button(class = "preset-chip", `data-ss` = "633", "633"),
+          tags$button(class = "preset-chip", `data-ss` = "744", "744"),
+          tags$button(class = "preset-chip", `data-ss` = "97531", "97531"),
+          tags$button(class = "preset-chip", `data-ss` = "432", "432 (trampa)")
+        ),
+        tags$div(id = "canvas-wrap", class = "board-wrap", tags$canvas(id = "juggle-canvas", class = "mesa", width = "720", height = "480")),
+        tags$div(id = "beat-ticker", class = "beat-ticker"),
+        tags$div(id = "message-box", class = "message-box", "Escribe un siteswap para empezar."),
+        tags$div(
+          class = "sub-section graph-shell",
+          tags$div(class = "formula-title", "La prueba de la permutación, en círculo"),
+          tags$div(id = "perm-meta", class = "graph-meta"),
+          tags$div(id = "perm-box", class = "graph-box"),
+          tags$p(class = "formula-line", style = "margin-top: 10px;", "Los n beats van en círculo y cada flecha lleva el beat i a su aterrizaje i + aᵢ (mod n). El patrón es malabareable exactamente cuando cada beat recibe una sola flecha; los aros pequeños son lanzamientos que caen en su propio beat (aᵢ ≡ 0 mod n) y las flechas grises son beats vacíos (aᵢ = 0). Si dos flechas caen en el mismo beat, ahí chocan las pelotas: se pintan en rojo.")
+        )
+      ),
+      tags$div(
+        class = "graph-card",
+        tags$div(
+          class = "section-head",
+          tags$div(class = "section-icon", HTML("&#128506;")),
+          tags$div(tags$h2(class = "section-title", "El grafo de estados"), tags$p(class = "section-subtitle", "Un estado dice qué beats futuros ya tienen pelota cayendo. Lanzar es avanzar por una arista; hacer un truco es recorrer un ciclo. El ciclo del patrón actual se pinta en violeta, y abajo puedes componer tu propio siteswap caminando por el grafo: si el camino se cierra, el truco es válido por construcción."))
+        ),
+        tags$div(
+          class = "graph-shell",
+          tags$div(
+            class = "controls-grid",
+            style = "grid-template-columns: 1fr 1fr; margin-bottom: 12px;",
+            tags$div(class = "control-box", tags$label(class = "control-label", `for` = "balls-select", "Pelotas b"), tags$select(id = "balls-select", class = "control-select", tags$option(value = "2", "2"), tags$option(value = "3", "3", selected = "selected"), tags$option(value = "4", "4"), tags$option(value = "5", "5"))),
+            tags$div(class = "control-box", tags$label(class = "control-label", `for` = "horizon-select", "Lanzamiento máximo m"), tags$select(id = "horizon-select", class = "control-select", tags$option(value = "3", "3"), tags$option(value = "4", "4"), tags$option(value = "5", "5", selected = "selected"), tags$option(value = "6", "6"), tags$option(value = "7", "7")))
+          ),
+          tags$div(id = "graph-meta", class = "graph-meta"),
+          tags$div(id = "graph-box", class = "graph-box"),
+          tags$div(
+            class = "explorer-card",
+            tags$h3(class = "explorer-title", "Compón tu truco caminando por el grafo"),
+            tags$div(id = "explorer-state", class = "explorer-state"),
+            tags$div(id = "explorer-throws", class = "explorer-throws"),
+            tags$div(class = "explorer-seq-row", tags$span(class = "explorer-seq-label", "Tu camino:"), tags$div(id = "explorer-seq", class = "explorer-seq", "—")),
+            tags$div(
+              class = "explorer-actions",
+              tags$button(id = "explorer-undo", class = "control-button small-btn", HTML("&#8617; Deshacer")),
+              tags$button(id = "explorer-reset", class = "control-button small-btn", HTML("&#8635; Reiniciar")),
+              tags$button(id = "explorer-load", class = "control-button small-btn", disabled = "disabled", HTML("&#9654; Cargar en el animador"))
+            ),
+            tags$div(id = "explorer-note", class = "explorer-note")
+          ),
+          tags$div(
+            class = "formula-box",
+            tags$div(class = "formula-title", "Los teoremas del malabarista"),
+            tags$p(class = "formula-line", "Teorema del promedio: el número de pelotas de un patrón válido es la media de la sucesión,"),
+            tags$div(class = "formula-math", HTML("b = (a&#8321; + a&#8322; + &#8943; + a&#8345;) / n")),
+            tags$p(class = "formula-line", "y el recíproco es falso: 432 tiene media 3 pero no existe. La caracterización completa es la prueba de la permutación:"),
+            tags$div(class = "formula-math", HTML("a&#8321;&#8943;a&#8345; es malabareable &#8660; i &#8614; i + a&#7522; (mod n) es una permutación")),
+            tags$p(class = "formula-line", "Contando descensos de permutaciones, Buhler, Eisenbud, Graham y Wright (American Mathematical Monthly, 1994) probaron que el número de sucesiones malabareables de período n con b pelotas es exactamente"),
+            tags$div(class = "formula-math", HTML("(b + 1)&#8319; &#8722; b&#8319;")),
+            tags$p(class = "formula-line", "El teorema de Shannon (sí, el de la información, que construía máquinas malabaristas) relaciona los tiempos del truco: con F el vuelo de cada pelota, D el tiempo en mano, V el tiempo de mano vacía, H manos y N pelotas,"),
+            tags$div(class = "formula-math", HTML("(F + D) &middot; H = (V + D) &middot; N")),
+            tags$p(class = "formula-line", "Y la física remata: el tiempo de vuelo crece linealmente con el valor del lanzamiento, pero la altura crece con su cuadrado y el margen de error se encoge igual de rápido. Por eso 7 pelotas es de élite y 11 es la frontera humana. Referencias: Polster, The Mathematics of Juggling (Springer); Ron Graham, presidente a la vez de la AMS y de la Asociación Internacional de Malabaristas.")
+          )
+        )
+      )
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  # La lógica vive en JavaScript para mantener la app fluida en shinyapps.io.
+}
+
+shinyApp(ui, server)

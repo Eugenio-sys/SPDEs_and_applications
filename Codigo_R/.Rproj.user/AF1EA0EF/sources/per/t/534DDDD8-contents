@@ -1,0 +1,494 @@
+library(shiny)
+
+css <- r"---(body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#f8fafc 0%,#e2e8f0 58%,#dbe4ef 100%);color:#0f172a;}
+
+    #rubik-app,#rubik-app *{box-sizing:border-box}
+    #rubik-app{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#0f172a;max-width:1320px;margin:0 auto;padding:18px}
+    #rubik-app .hero-card,#rubik-app .board-card,#rubik-app .theory-card,#rubik-app .stat-card,#rubik-app .success-card{background:rgba(255,255,255,.84);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.8);box-shadow:0 18px 45px rgba(15,23,42,.10)}
+    #rubik-app .hero-card,#rubik-app .board-card,#rubik-app .theory-card{border-radius:30px}#rubik-app .hero-card{padding:28px}#rubik-app .board-card,#rubik-app .theory-card{padding:22px}
+    #rubik-app .badge{display:inline-flex;align-items:center;gap:8px;border-radius:999px;border:1px solid #e2e8f0;background:#fff;padding:7px 12px;font-size:11px;font-weight:850;letter-spacing:.16em;text-transform:uppercase;color:#64748b}
+    #rubik-app .hero-title{margin:14px 0 0;max-width:980px;font-size:clamp(2rem,4.2vw,3.5rem);line-height:1.02;font-weight:950;letter-spacing:-.045em;color:#020617}
+    #rubik-app .hero-subtitle{margin:14px 0 0;max-width:980px;color:#475569;font-size:16px;line-height:1.72}
+    #rubik-app .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:22px}
+    #rubik-app .stat-card{border-radius:24px;padding:16px;border:1px solid #e2e8f0;background:rgba(255,255,255,.94);box-shadow:0 4px 16px rgba(15,23,42,.05);min-width:0}
+    #rubik-app .stat-label{color:#64748b;font-size:13px;font-weight:800;margin-bottom:8px}#rubik-app .stat-value{font-size:29px;font-weight:950;letter-spacing:-.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#rubik-app .stat-subvalue{margin-top:6px;color:#64748b;font-size:12px;line-height:1.45;min-height:2.8em}
+    #rubik-app .play-grid{display:grid;grid-template-columns:minmax(0,1.38fr) minmax(355px,.62fr);gap:18px;align-items:start;margin-top:16px}
+    #rubik-app .section-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px}#rubik-app .section-icon{width:42px;height:42px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#fff;box-shadow:0 8px 18px rgba(15,23,42,.18);font-size:18px;flex:0 0 auto}#rubik-app .section-title{margin:0;font-size:25px;font-weight:900;letter-spacing:-.03em}#rubik-app .section-subtitle{margin:5px 0 0;color:#64748b;font-size:14px;line-height:1.65}
+    #rubik-app .controls-grid{display:grid;grid-template-columns:minmax(150px,.8fr) repeat(5,auto);gap:10px;align-items:stretch;margin-bottom:12px}#rubik-app .control-box{border-radius:20px;border:1px solid #e2e8f0;background:rgba(255,255,255,.94);padding:11px 13px}#rubik-app .control-label{display:block;font-size:12px;font-weight:850;color:#334155;margin-bottom:6px}#rubik-app .control-select{width:100%;border:1px solid #cbd5e1;border-radius:13px;padding:10px 12px;background:#fff;font-weight:800;color:#0f172a}
+    #rubik-app .control-button{border:1px solid #e2e8f0;background:#fff;border-radius:17px;padding:12px 15px;min-height:46px;font-size:13px;font-weight:850;color:#334155;cursor:pointer;box-shadow:0 4px 12px rgba(15,23,42,.05);transition:transform 120ms ease,box-shadow 120ms ease,background 120ms ease,opacity 140ms ease 260ms}#rubik-app .control-button:hover{transform:translateY(-1px);box-shadow:0 10px 20px rgba(15,23,42,.09);background:#f8fafc}#rubik-app .control-button.primary{background:#0f172a;border-color:#0f172a;color:#fff}#rubik-app .control-button.accent{background:#7c3aed;border-color:#7c3aed;color:#fff}#rubik-app .control-button.warn{background:#fff7ed;border-color:#fed7aa;color:#9a3412}#rubik-app .control-button:disabled{opacity:.42;cursor:not-allowed;transform:none;box-shadow:none}
+    #rubik-app .status-strip{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px;margin-bottom:12px;border:1px solid #e2e8f0;border-radius:18px;background:#f8fafc;padding:11px 13px}#rubik-app .status-text{font-size:13px;line-height:1.55;color:#334155;font-weight:650;flex:1 1 420px;min-width:0}#rubik-app .status-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid #ddd6fe;background:#faf5ff;color:#6d28d9;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:900;white-space:nowrap}
+    #rubik-app .cube-stage{position:relative;width:100%;height:540px;border-radius:28px;border:1px solid #cbd5e1;overflow:hidden;background:radial-gradient(circle at 50% 38%,rgba(255,255,255,.99),rgba(241,245,249,.95) 48%,rgba(226,232,240,.99) 100%);touch-action:none;user-select:none;perspective:900px;perspective-origin:50% 47%}
+    #rubik-app .cube-orbit{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d;transform:rotateX(-26deg) rotateY(38deg) scale(.98);will-change:transform}
+    #rubik-app .cube-world{position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d}
+    #rubik-app .cubie{position:absolute;left:-27px;top:-27px;width:54px;height:54px;transform-style:preserve-3d}
+    #rubik-app .cubie-face{position:absolute;inset:0;background:#111827;border:1.5px solid #020617;border-radius:4px;backface-visibility:hidden;box-shadow:inset 0 0 0 2px rgba(255,255,255,.02)}
+    #rubik-app .cubie-face.sticker{border:5px solid #111827;box-shadow:inset 0 0 0 1px rgba(255,255,255,.24);cursor:grab;transition:filter 100ms ease,box-shadow 100ms ease}#rubik-app .cubie-face.sticker.drag-source{filter:brightness(1.12);box-shadow:inset 0 0 0 2px rgba(255,255,255,.72),0 0 0 3px rgba(124,58,237,.42);cursor:grabbing}
+    #rubik-app .f-front{transform:translateZ(27px)}#rubik-app .f-back{transform:rotateY(180deg) translateZ(27px)}#rubik-app .f-right{transform:rotateY(90deg) translateZ(27px)}#rubik-app .f-left{transform:rotateY(-90deg) translateZ(27px)}#rubik-app .f-up{transform:rotateX(90deg) translateZ(27px)}#rubik-app .f-down{transform:rotateX(-90deg) translateZ(27px)}
+    #rubik-app .stage-tip{position:absolute;top:12px;right:12px;z-index:5;border:1px solid rgba(203,213,225,.9);background:rgba(255,255,255,.88);backdrop-filter:blur(6px);border-radius:999px;padding:7px 10px;font-size:11px;font-weight:800;color:#64748b;pointer-events:none}#rubik-app .stage-axis{position:absolute;left:12px;bottom:12px;z-index:5;display:flex;gap:6px;flex-wrap:wrap}#rubik-app .axis-chip{border-radius:999px;padding:6px 9px;font-size:10px;font-weight:900;border:1px solid rgba(203,213,225,.9);background:rgba(255,255,255,.9);color:#475569}
+    #rubik-app .move-panel{margin-top:12px;border:1px solid #e2e8f0;border-radius:22px;background:#fff;padding:13px}#rubik-app .move-panel-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}#rubik-app .move-title{font-size:13px;font-weight:900;color:#0f172a}#rubik-app .move-note{font-size:11px;color:#64748b}#rubik-app .moves-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
+    #rubik-app .move-btn{border:1px solid #dbe4ef;background:#f8fafc;color:#0f172a;border-radius:13px;padding:10px 5px;min-height:42px;font-weight:950;cursor:pointer;transition:transform 100ms ease,background 100ms ease,opacity 140ms ease 260ms}#rubik-app .move-btn:hover{transform:translateY(-1px);background:#f1f5f9}#rubik-app .move-btn.prime{color:#7c3aed;background:#faf5ff;border-color:#e9d5ff}#rubik-app .move-btn.double{color:#0369a1;background:#f0f9ff;border-color:#bae6fd}#rubik-app .move-btn:disabled{opacity:.4;cursor:not-allowed}
+    #rubik-app .history-box{margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:10px;display:flex;gap:7px;flex-wrap:wrap;min-height:34px}#rubik-app .history-token{display:inline-flex;align-items:center;justify-content:center;min-width:30px;padding:5px 7px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;font-size:11px;font-weight:900;color:#334155}#rubik-app .history-empty{font-size:11px;color:#94a3b8;padding:5px 0}
+    #rubik-app .challenge-card{display:none;margin-top:12px;border-radius:22px;border:1px solid #ddd6fe;background:linear-gradient(180deg,#faf5ff 0%,#f5f3ff 100%);padding:14px}#rubik-app .challenge-card.on{display:block}#rubik-app .challenge-title{margin:0 0 6px;color:#581c87;font-size:15px;font-weight:950}#rubik-app .challenge-text{margin:0;color:#6d28d9;font-size:12px;line-height:1.65}#rubik-app .challenge-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    #rubik-app .tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}#rubik-app .tab-btn{border:1px solid #e2e8f0;background:#fff;color:#475569;border-radius:999px;padding:8px 10px;font-size:11px;font-weight:900;cursor:pointer}#rubik-app .tab-btn.active{background:#0f172a;color:#fff;border-color:#0f172a}#rubik-app .tab-panel{display:none}#rubik-app .tab-panel.active{display:block}
+    #rubik-app .math-box,#rubik-app .theory-box,#rubik-app .algorithm-box{border:1px solid #e2e8f0;border-radius:20px;background:rgba(255,255,255,.95);padding:14px;margin-bottom:10px}#rubik-app .kicker{text-transform:uppercase;letter-spacing:.14em;color:#7c3aed;font-size:10px;font-weight:950;margin-bottom:7px}#rubik-app .big-number{font-size:clamp(1.35rem,2.7vw,2rem);line-height:1.08;font-weight:950;letter-spacing:-.04em;color:#0f172a;overflow-wrap:anywhere}#rubik-app .math-line{font-family:Georgia,Cambria,"Times New Roman",serif;font-size:17px;color:#111827;line-height:1.65}#rubik-app .small-text{color:#64748b;font-size:12px;line-height:1.65;margin-top:7px}#rubik-app .piece-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}#rubik-app .piece-card{border:1px solid #e2e8f0;border-radius:15px;padding:10px;background:#f8fafc}#rubik-app .piece-n{font-size:20px;font-weight:950}#rubik-app .piece-l{margin-top:3px;color:#64748b;font-size:10px;font-weight:800}
+    #rubik-app .notation-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}#rubik-app .notation-item{border:1px solid #e2e8f0;border-radius:15px;padding:10px;background:#fff}#rubik-app .notation-symbol{font-size:20px;font-weight:950;color:#0f172a}#rubik-app .notation-desc{margin-top:3px;color:#64748b;font-size:11px;line-height:1.4}#rubik-app .algorithm-grid{display:grid;grid-template-columns:1fr auto;gap:9px;align-items:end}#rubik-app .algorithm-seq{margin-top:9px;padding:10px;border-radius:14px;border:1px solid #e2e8f0;background:#f8fafc;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;font-weight:850;color:#334155;line-height:1.5;word-break:break-word}#rubik-app .algorithm-desc{margin-top:8px;color:#64748b;font-size:11px;line-height:1.55}
+    #rubik-app .success-card{display:none;margin-top:14px;border-radius:22px;padding:15px 16px}#rubik-app .success-card.show{display:block}#rubik-app .success-card.gold{background:linear-gradient(180deg,#fffbeb,#fef3c7);border:1px solid #f5d76e;color:#92400e}#rubik-app .success-card.silver{background:linear-gradient(180deg,#f8fafc,#eef2f7);border:1px solid #cbd5e1;color:#334155}#rubik-app .success-card.bronze{background:linear-gradient(180deg,#fff7ed,#f7e3d2);border:1px solid #d6b08a;color:#7c2d12}#rubik-app .success-title{margin:0 0 5px;font-size:18px;font-weight:950}#rubik-app .success-text{margin:0;font-size:12px;line-height:1.65}#rubik-app .footer-note{margin-top:14px;text-align:center;color:#64748b;font-size:11px;line-height:1.6}
+    @media(max-width:1080px){#rubik-app .play-grid{grid-template-columns:1fr}}@media(max-width:850px){#rubik-app .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#rubik-app .controls-grid{grid-template-columns:1fr 1fr}}@media(max-width:620px){#rubik-app{padding:12px}#rubik-app .hero-card,#rubik-app .board-card,#rubik-app .theory-card{padding:17px;border-radius:24px}#rubik-app .stats-grid{grid-template-columns:1fr 1fr;gap:9px}#rubik-app .stat-value{font-size:24px}#rubik-app .controls-grid{grid-template-columns:1fr}#rubik-app .cube-stage{height:400px}#rubik-app .moves-grid{grid-template-columns:repeat(3,minmax(0,1fr))}#rubik-app .piece-grid,#rubik-app .notation-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#rubik-app .algorithm-grid{grid-template-columns:1fr}}
+  )---"
+
+body_html <- r"---(<div id="rubik-app" class="app-shell" tabindex="0">
+
+  <section class="hero-card">
+    <div class="badge">✦ Laboratorio 3D · Cubo de Rubik</div>
+    <h1 class="hero-title">El Cubo de Rubik como grupo, algoritmo y reto</h1>
+    <p class="hero-subtitle">Un cubo 3×3×3 totalmente autocontenido: rota la cámara, gira capas con animación, genera scrambles, compite contra tu propio tiempo y explora la combinatoria y la estructura algebraica detrás del rompecabezas.</p>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Movimientos</div><div id="stat-moves" class="stat-value">0</div><div class="stat-subvalue">Cuenta tus giros después del scramble.</div></div>
+      <div class="stat-card"><div class="stat-label">Tiempo</div><div id="stat-time" class="stat-value">00:00</div><div class="stat-subvalue">En reto, comienza con tu primer movimiento.</div></div>
+      <div class="stat-card"><div class="stat-label">Scramble</div><div id="stat-scramble" class="stat-value">—</div><div class="stat-subvalue">Longitud de la mezcla generada.</div></div>
+      <div class="stat-card"><div class="stat-label">Estado</div><div id="stat-state" class="stat-value">Resuelto</div><div class="stat-subvalue">Se comprueba la uniformidad de las seis caras.</div></div>
+    </div>
+  </section>
+
+  <div class="play-grid">
+    <section class="board-card">
+      <div class="section-head"><div class="section-icon">🧩</div><div><h2 class="section-title">Cubo 3×3×3 interactivo</h2><p class="section-subtitle">Arrastra el fondo para mover la cámara. Arrastra directamente cualquier sticker en cualquiera de las cuatro direcciones para mover la fila o columna que pasa por esa pieza.</p></div></div>
+      <div class="controls-grid">
+        <div class="control-box"><label class="control-label" for="scramble-length">Longitud del scramble</label><select id="scramble-length" class="control-select"><option value="12">12 movimientos</option><option value="18">18 movimientos</option><option value="20" selected>20 movimientos</option><option value="25">25 movimientos</option></select></div>
+        <button id="scramble-btn" class="control-button accent" data-lockable="1" type="button">↻ Aleatorizar</button>
+        <button id="challenge-btn" class="control-button primary" data-lockable="1" type="button">🏆 Reto</button>
+        <button id="undo-btn" class="control-button" data-lockable="1" type="button">↩ Deshacer</button>
+        <button id="reset-btn" class="control-button" data-lockable="1" type="button">Resuelto</button><button id="front-view-btn" class="control-button" type="button">◫ Casi frontal</button>
+      </div>
+      <div id="cube-stage" class="cube-stage" aria-label="Cubo de Rubik tridimensional interactivo">
+        <div id="cube-orbit" class="cube-orbit"><div id="cube-world" class="cube-world"></div></div>
+        <div class="stage-tip">Sticker = fila/columna · fondo = cámara</div>
+        <div class="stage-axis"><span class="axis-chip">U/D · arriba/abajo</span><span class="axis-chip">L/R · izquierda/derecha</span><span class="axis-chip">F/B · frente/fondo</span></div>
+      </div>
+      <div class="status-strip"><div id="status-text" class="status-text">Cubo resuelto. Arrastra un sticker para girar una capa, o el fondo para mover la cámara.</div><div id="status-chip" class="status-chip">Listo</div></div>
+      <div class="move-panel">
+        <div class="move-panel-head"><div class="move-title">Giros de cara</div><div class="move-note">' = inverso · 2 = media vuelta</div></div>
+        <div class="moves-grid" id="moves-grid"></div>
+        <div id="history-box" class="history-box"><span class="history-empty">Sin movimientos todavía.</span></div>
+      </div>
+      <div id="challenge-card" class="challenge-card"><h3 class="challenge-title">Reto activo</h3><p class="challenge-text">Resuelve la mezcla. Oro: sin pistas y hasta 45 movimientos. Plata: sin pistas y hasta 80. Bronce: cualquier solución restante. Son reglas de juego de esta app, no cotas de optimalidad.</p><div class="challenge-row"><button id="hint-btn" class="control-button warn" data-lockable="1" type="button">Pista</button><button id="solve-btn" class="control-button" data-lockable="1" type="button">Resolver historial</button></div><div id="hint-text" class="small-text">Resuélvelo sin pistas para aspirar a oro o plata.</div></div>
+      <div id="success-card" class="success-card"><h3 id="success-title" class="success-title"></h3><p id="success-text" class="success-text"></p></div>
+    </section>
+
+    <aside class="theory-card">
+      <div class="section-head"><div class="section-icon">Σ</div><div><h2 class="section-title">Matemática del cubo</h2><p class="section-subtitle">Un sistema finito de permutaciones con restricciones de orientación y paridad.</p></div></div>
+      <div class="tabs"><button class="tab-btn active" data-tab="combinatoria" type="button">Combinatoria</button><button class="tab-btn" data-tab="notacion" type="button">Notación</button><button class="tab-btn" data-tab="algoritmos" type="button">Algoritmos</button><button class="tab-btn" data-tab="estructura" type="button">Estructura</button></div>
+      <div class="tab-panel active" data-panel="combinatoria">
+        <div class="math-box"><div class="kicker">Estados alcanzables</div><div class="big-number">43,252,003,274,489,856,000</div><div class="math-line">8! · 12! · 3<sup>7</sup> · 2<sup>10</sup></div><p class="small-text">Las 8 esquinas y 12 aristas pueden permutarse, pero la paridad de ambas permutaciones debe coincidir. La orientación de la última esquina y de la última arista queda determinada por las restantes.</p></div>
+        <div class="piece-grid"><div class="piece-card"><div class="piece-n">8</div><div class="piece-l">ESQUINAS</div></div><div class="piece-card"><div class="piece-n">12</div><div class="piece-l">ARISTAS</div></div><div class="piece-card"><div class="piece-n">6</div><div class="piece-l">CENTROS</div></div></div>
+        <div class="theory-box"><div class="kicker">Número de Dios</div><div class="math-line"><strong>20</strong> movimientos en half-turn metric</div><p class="small-text">Toda posición alcanzable puede resolverse en 20 movimientos o menos cuando una media vuelta cuenta como un movimiento. El botón “Resolver historial” no busca esa solución mínima: invierte el historial conocido.</p></div>
+      </div>
+      <div class="tab-panel" data-panel="notacion"><div class="theory-box"><div class="kicker">Seis generadores</div><div class="notation-grid"><div class="notation-item"><div class="notation-symbol">U</div><div class="notation-desc">Up · superior</div></div><div class="notation-item"><div class="notation-symbol">D</div><div class="notation-desc">Down · inferior</div></div><div class="notation-item"><div class="notation-symbol">L</div><div class="notation-desc">Left · izquierda</div></div><div class="notation-item"><div class="notation-symbol">R</div><div class="notation-desc">Right · derecha</div></div><div class="notation-item"><div class="notation-symbol">F</div><div class="notation-desc">Front · frontal</div></div><div class="notation-item"><div class="notation-symbol">B</div><div class="notation-desc">Back · posterior</div></div></div><p class="small-text">X' es el inverso de X y X2 es una media vuelta. Una solución es una palabra formada con estos símbolos.</p></div><div class="math-box"><div class="kicker">Invertir una palabra</div><div class="math-line">(R U R' U')<sup>−1</sup> = U R U' R'</div><p class="small-text">Se invierte el orden y cada movimiento se reemplaza por su inverso.</p></div></div>
+      <div class="tab-panel" data-panel="algoritmos"><div class="algorithm-box"><div class="kicker">Laboratorio de algoritmos</div><div class="algorithm-grid"><div><label class="control-label" for="algorithm-select">Secuencia</label><select id="algorithm-select" class="control-select"><option value="sexy">Sexy move</option><option value="sledge">Sledgehammer</option><option value="sune">Sune</option><option value="tperm">T-perm</option></select></div><button id="run-algorithm" class="control-button primary" data-lockable="1" type="button">Ejecutar</button></div><div id="algorithm-seq" class="algorithm-seq"></div><div id="algorithm-desc" class="algorithm-desc"></div><div class="challenge-row"><button id="invert-algorithm" class="control-button" data-lockable="1" type="button">Ejecutar inversa</button></div></div><div class="theory-box"><div class="kicker">Idea central</div><p class="small-text">Un algoritmo es una palabra diseñada para producir un efecto controlado. Conmutadores y conjugados permiten localizar efectos sobre pocas piezas.</p></div></div>
+      <div class="tab-panel" data-panel="estructura"><div class="math-box"><div class="kicker">Acción de grupo</div><div class="math-line">G = ⟨U, D, L, R, F, B⟩</div><p class="small-text">Cada giro actúa como una permutación de cubies junto con cambios de orientación. Componer giros equivale a multiplicar elementos del grupo del cubo.</p></div><div class="theory-box"><div class="kicker">Tres restricciones</div><p class="small-text">La suma de orientaciones de esquinas es 0 módulo 3; la suma de orientaciones de aristas es 0 módulo 2; las permutaciones de aristas y esquinas tienen la misma paridad.</p></div><div class="theory-box"><div class="kicker">Alguna solución ≠ solución mínima</div><p class="small-text">Invertir el historial garantiza regresar al estado resuelto. Encontrar la palabra más corta exige resolver un problema distinto sobre el grafo de estados.</p></div></div>
+    </aside>
+  </div>
+  <div class="footer-note">Interacción: arrastra cualquier sticker arriba, abajo, izquierda o derecha para mover su fila/columna; arrastra el fondo para rotar la cámara. Atajos: U, D, L, R, F, B · Shift + letra = inversa.</div>
+</div>
+)---"
+
+js <- r"---(
+  (function(){
+    const root=document.getElementById('rubik-app'); if(!root||root.dataset.ready==='1')return; root.dataset.ready='1';
+    const world=root.querySelector('#cube-world'), orbit=root.querySelector('#cube-orbit'), stage=root.querySelector('#cube-stage');
+    const statusText=root.querySelector('#status-text'),statusChip=root.querySelector('#status-chip'),historyBox=root.querySelector('#history-box');
+    const statMoves=root.querySelector('#stat-moves'),statTime=root.querySelector('#stat-time'),statScramble=root.querySelector('#stat-scramble'),statState=root.querySelector('#stat-state');
+    const challengeCard=root.querySelector('#challenge-card'),hintText=root.querySelector('#hint-text'),success=root.querySelector('#success-card'),successTitle=root.querySelector('#success-title'),successText=root.querySelector('#success-text');
+    const scrambleLen=root.querySelector('#scramble-length'),algorithmSelect=root.querySelector('#algorithm-select'),algorithmSeq=root.querySelector('#algorithm-seq'),algorithmDesc=root.querySelector('#algorithm-desc');
+    const movesGrid=root.querySelector('#moves-grid');
+    const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const size=54,gap=3,step=size+gap;
+    const COLORS={U:'#ffffff',D:'#ffd500',F:'#00a651',B:'#0051ba',R:'#c41e3a',L:'#ff5800'};
+    const normals={U:[0,-1,0],D:[0,1,0],F:[0,0,1],B:[0,0,-1],R:[1,0,0],L:[-1,0,0]};
+    const faceInfo={
+      U:{n:[0,-1,0],layer:1},D:{n:[0,1,0],layer:1},
+      R:{n:[1,0,0],layer:1},L:{n:[-1,0,0],layer:1},
+      F:{n:[0,0,1],layer:1},B:{n:[0,0,-1],layer:1},
+      M:{n:[-1,0,0],layer:0},
+      E:{n:[0,1,0],layer:0},
+      S:{n:[0,0,1],layer:0}
+    };
+    const faceClass={U:'f-up',D:'f-down',F:'f-front',B:'f-back',R:'f-right',L:'f-left'};
+    const algorithms={
+      sexy:{name:'Sexy move',seq:['R','U',"R'","U'"],desc:'Conmutador corto muy usado; concentra el efecto en pocas piezas.'},
+      sledge:{name:'Sledgehammer',seq:["R'",'F','R',"F'"],desc:'Secuencia breve que aparece en procedimientos de orientación e inserción.'},
+      sune:{name:'Sune',seq:['R','U',"R'",'U','R','U2',"R'"],desc:'Algoritmo clásico para orientar esquinas de la última capa.'},
+      tperm:{name:'T-perm',seq:['R','U',"R'","U'","R'",'F','R2',"U'","R'","U'",'R','U',"R'","F'"],desc:'Permutación de última capa que intercambia dos esquinas y dos aristas.'}
+    };
+    let cubies=[],history=[],scrambleBase=0,currentScramble=[],playerMoves=0,hintCount=0,challenge=false,busy=false,queue=[];
+    let timerRunning=false,timerStart=0,elapsed=0,timerId=null;
+    const D2R=Math.PI/180;
+    let view={m:null,scale:.98};
+    function viewInit(){view.m=mmSafe(rotAxis(1,-26*D2R),rotAxis(2,38*D2R))}
+    function rotAxis(i,a){const u=[[1,0,0],[0,1,0],[0,0,1]][i-1];return rotBasic(u,a)}
+    function rotBasic(u,a){const [x,y,z]=u,c=Math.cos(a),s=Math.sin(a),t=1-c;return [[t*x*x+c,t*x*y-s*z,t*x*z+s*y],[t*x*y+s*z,t*y*y+c,t*y*z-s*x],[t*x*z-s*y,t*y*z+s*x,t*z*z+c]]}
+    function mmSafe(A,B){return A.map(r=>B[0].map((_,j)=>r[0]*B[0][j]+r[1]*B[1][j]+r[2]*B[2][j]))}
+    function northo(M){
+      // Gram-Schmidt por filas: mata la deriva numerica de tantas multiplicaciones
+      let a=M[0].slice(),b=M[1].slice();
+      const na=Math.hypot(a[0],a[1],a[2])||1;a=a.map(v=>v/na);
+      const ab=a[0]*b[0]+a[1]*b[1]+a[2]*b[2];b=[b[0]-ab*a[0],b[1]-ab*a[1],b[2]-ab*a[2]];
+      const nb=Math.hypot(b[0],b[1],b[2])||1;b=b.map(v=>v/nb);
+      const c=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+      return [a,b,c];
+    }
+    function spinView(vyawDeg,vpitchDeg){
+      // giros en ejes de PANTALLA, premultiplicados: el cubo siempre sigue el dedo, sin topes ni inversiones
+      view.m=northo(mmSafe(rotAxis(1,vpitchDeg*D2R),mmSafe(rotAxis(2,vyawDeg*D2R),view.m)));
+    }
+    function m2q(M){
+      const tr=M[0][0]+M[1][1]+M[2][2];let q;
+      if(tr>0){const s=Math.sqrt(tr+1)*2;q=[(M[2][1]-M[1][2])/s,(M[0][2]-M[2][0])/s,(M[1][0]-M[0][1])/s,s/4]}
+      else if(M[0][0]>M[1][1]&&M[0][0]>M[2][2]){const s=Math.sqrt(1+M[0][0]-M[1][1]-M[2][2])*2;q=[s/4,(M[0][1]+M[1][0])/s,(M[0][2]+M[2][0])/s,(M[2][1]-M[1][2])/s]}
+      else if(M[1][1]>M[2][2]){const s=Math.sqrt(1+M[1][1]-M[0][0]-M[2][2])*2;q=[(M[0][1]+M[1][0])/s,s/4,(M[1][2]+M[2][1])/s,(M[0][2]-M[2][0])/s]}
+      else{const s=Math.sqrt(1+M[2][2]-M[0][0]-M[1][1])*2;q=[(M[0][2]+M[2][0])/s,(M[1][2]+M[2][1])/s,s/4,(M[1][0]-M[0][1])/s]}
+      return q;
+    }
+    function q2m(q){
+      const [x,y,z,w]=q;
+      return [[1-2*(y*y+z*z),2*(x*y-z*w),2*(x*z+y*w)],[2*(x*y+z*w),1-2*(x*x+z*z),2*(y*z-x*w)],[2*(x*z-y*w),2*(y*z+x*w),1-2*(x*x+y*y)]];
+    }
+    function slerp(a,b,t){
+      let d=a[0]*b[0]+a[1]*b[1]+a[2]*b[2]+a[3]*b[3];
+      let bb=b;
+      if(d<0){d=-d;bb=b.map(v=>-v)}
+      if(d>0.9995){const q=a.map((v,i)=>v+(bb[i]-v)*t);const n=Math.hypot(q[0],q[1],q[2],q[3]);return q.map(v=>v/n)}
+      const th=Math.acos(d),s=Math.sin(th);
+      const wa=Math.sin((1-t)*th)/s,wb=Math.sin(t*th)/s;
+      return a.map((v,i)=>wa*v+wb*bb[i]);
+    }
+    let gesture={mode:null,id:null,startX:0,startY:0,lastX:0,lastY:0,source:null,cubie:null,localNormal:null,choice:null,preview:null,targetFrac:0};
+    let followId=null;
+    function cancelFollow(){if(followId!==null){cancelAnimationFrame(followId);followId=null}}
+    function ensureFollow(){
+      if(followId!==null)return;
+      let last=performance.now();
+      function step(now){
+        followId=null;
+        if(gesture.mode!=='slice'||!gesture.preview)return;
+        const dt=Math.min(50,Math.max(1,now-last));last=now;
+        const k=1-Math.exp(-dt/45);
+        applyPreview(gesture.preview,gesture.preview.fraction+(gesture.targetFrac-gesture.preview.fraction)*k);
+        followId=requestAnimationFrame(step);
+      }
+      followId=requestAnimationFrame(step);
+    }
+
+    let inertiaId=null,inertiaV=[0,0],inertiaRun=0;
+    function cancelInertia(){inertiaRun+=1;if(inertiaId!==null){cancelAnimationFrame(inertiaId);inertiaId=null}inertiaV=[0,0]}
+    function startInertia(vyaw,vpitch){
+      cancelInertia();
+      if(reduced)return;
+      const speed=Math.hypot(vyaw,vpitch);
+      if(speed<.02)return;
+      const cap=1.4;                                  // grados por milisegundo, tope de cordura
+      if(speed>cap){vyaw*=cap/speed;vpitch*=cap/speed}
+      inertiaV=[vyaw,vpitch];
+      const run=++inertiaRun;
+      let last=performance.now();
+      function step(now){
+        if(run!==inertiaRun)return;
+        const dt=Math.min(50,Math.max(1,now-last));last=now;
+        spinView(inertiaV[0]*dt,inertiaV[1]*dt);
+        const damp=Math.exp(-dt/620);                 // friccion exponencial: ~2 s de deriva agradable
+        inertiaV[0]*=damp;inertiaV[1]*=damp;
+        applyView();
+        if(Math.hypot(inertiaV[0],inertiaV[1])>.0035){inertiaId=requestAnimationFrame(step)}
+        else{inertiaId=null;inertiaV=[0,0]}
+      }
+      inertiaId=requestAnimationFrame(step);
+    }
+    function I(){return [[1,0,0],[0,1,0],[0,0,1]]}
+    function mm(A,B){return A.map((r,i)=>B[0].map((_,j)=>r[0]*B[0][j]+r[1]*B[1][j]+r[2]*B[2][j]))}
+    function mv(A,v){return [A[0][0]*v[0]+A[0][1]*v[1]+A[0][2]*v[2],A[1][0]*v[0]+A[1][1]*v[1]+A[1][2]*v[2],A[2][0]*v[0]+A[2][1]*v[1]+A[2][2]*v[2]]}
+    function rot(axis,a){const [x,y,z]=axis,c=Math.cos(a),s=Math.sin(a),t=1-c;return [[t*x*x+c,t*x*y-s*z,t*x*z+s*y],[t*x*y+s*z,t*y*y+c,t*y*z-s*x],[t*x*z-s*y,t*y*z+s*x,t*z*z+c]]}
+    function roundM(A){return A.map(r=>r.map(v=>Math.abs(v)<1e-7?0:Math.round(v)))}
+    function roundV(v){return v.map(x=>Math.abs(x)<1e-7?0:Math.round(x))}
+    function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]}
+    function cross(a,b){return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]}
+    function len2(v){return Math.hypot(v[0],v[1])}
+    function unit2(v){const L=len2(v)||1;return [v[0]/L,v[1]/L]}
+    function clamp(x,a,b){return Math.max(a,Math.min(b,x))}
+    function screenVec(v){
+      // Filas de la matriz de vista: proyeccion exacta en cualquier orientacion, sin APIs del navegador
+      const M=view.m;
+      return [M[0][0]*v[0]+M[0][1]*v[1]+M[0][2]*v[2],M[1][0]*v[0]+M[1][1]*v[1]+M[1][2]*v[2]];
+    }
+    function faceCodeFromVector(v){
+      const q=roundV(v);
+      for(const code of Object.keys(normals)){
+        const n=normals[code];
+        if(n[0]===q[0]&&n[1]===q[1]&&n[2]===q[2])return code;
+      }
+      return null;
+    }
+    function matrix3d(O,p){const t=[p[0]*step,p[1]*step,p[2]*step];return `matrix3d(${O[0][0]},${O[1][0]},${O[2][0]},0,${O[0][1]},${O[1][1]},${O[2][1]},0,${O[0][2]},${O[1][2]},${O[2][2]},0,${t[0]},${t[1]},${t[2]},1)`}
+    function setCubieTransform(c,O,p){c.el.style.transform=matrix3d(O,p)}
+    function makeFace(code,sticker){const d=document.createElement('div');d.className=`cubie-face ${faceClass[code]}`+(sticker?' sticker':'');if(sticker)d.style.background=COLORS[code];return d}
+    function makeCubie(x,y,z){
+      const el=document.createElement('div');el.className='cubie';
+      const c={el,pos:[x,y,z],ori:I(),stickers:{}};
+      ['U','D','F','B','R','L'].forEach(code=>{
+        const n=normals[code],isSticker=(n[0]===x&&x!==0)||(n[1]===y&&y!==0)||(n[2]===z&&z!==0);
+        const face=makeFace(code,isSticker);
+        if(isSticker){
+          c.stickers[code]=n.slice();
+          face.dataset.stickerCode=code;
+          face.dataset.homePos=[x,y,z].join(',');
+          face._rubikCubie=c;
+          face._rubikLocalNormal=n.slice();
+        }
+        el.appendChild(face);
+      });
+      world.appendChild(el);setCubieTransform(c,c.ori,c.pos);return c
+    }
+    function build(){world.innerHTML='';cubies=[];for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++)cubies.push(makeCubie(x,y,z))}
+    function applyView(){
+      const M=view.m,s=view.scale;
+      orbit.style.transform=`matrix3d(${M[0][0]*s},${M[1][0]*s},${M[2][0]*s},0,${M[0][1]*s},${M[1][1]*s},${M[2][1]*s},0,${M[0][2]*s},${M[1][2]*s},${M[2][2]*s},0,0,0,0,1)`;
+    }
+    function animateViewTo(tx,ty,ts){cancelInertia();
+      const q0=m2q(view.m),q1=m2q(mmSafe(rotAxis(1,tx*D2R),rotAxis(2,ty*D2R)));
+      const ss=view.scale,start=performance.now(),dur=reduced?1:260;
+      function frame(now){
+        const t=clamp((now-start)/dur,0,1),e=ease(t);
+        view.m=q2m(slerp(q0,q1,e));view.scale=ss+(ts-ss)*e;applyView();
+        if(t<1)requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+    function tokenForAxisLayer(axisIndex,layer,thetaSign){
+      let base=null,baseSign=1;
+      if(axisIndex===0&&layer===1){base='R';baseSign=1}
+      if(axisIndex===0&&layer===0){base='M';baseSign=-1}
+      if(axisIndex===0&&layer===-1){base='L';baseSign=-1}
+      if(axisIndex===1&&layer===1){base='D';baseSign=1}
+      if(axisIndex===1&&layer===0){base='E';baseSign=1}
+      if(axisIndex===1&&layer===-1){base='U';baseSign=-1}
+      if(axisIndex===2&&layer===1){base='F';baseSign=1}
+      if(axisIndex===2&&layer===0){base='S';baseSign=1}
+      if(axisIndex===2&&layer===-1){base='B';baseSign=-1}
+      if(!base)return null;
+      return thetaSign===baseSign?base:base+"'";
+    }
+    function inferStickerDrag(c,localNormal,dx,dy){
+      const L=Math.hypot(dx,dy);if(L<7)return null;
+      const g=[dx/L,dy/L],faceN=roundV(mv(c.ori,localNormal));
+      const axes=[[1,0,0],[0,1,0],[0,0,1]];
+      let best=null;
+
+      // Un sticker vive en un plano. Hay exactamente dos ejes del cubo
+      // contenidos en ese plano. Cada eje determina la fila/columna que
+      // atraviesa el sticker; el signo del arrastre decide el sentido.
+      axes.forEach((axis,i)=>{
+        if(Math.abs(dot(axis,faceN))>.5)return;
+
+        // -1, 0 y +1 son válidos. El 0 produce M, E o S.
+        const layer=Math.round(dot(c.pos,axis));
+        if(layer < -1 || layer > 1)return;
+
+        // Dirección instantánea EN EL PUNTO DEL STICKER bajo un giro positivo.
+        // Con la tangente del centro del cubito, en vistas de canto podía apuntar
+        // directo a la cámara y descartar un giro perfectamente válido.
+        const qs=[c.pos[0]+.5*faceN[0],c.pos[1]+.5*faceN[1],c.pos[2]+.5*faceN[2]];
+        const tangent=cross(axis,qs);
+        const sv=screenVec(tangent);
+        if(len2(sv)<.001)return;
+
+        const u=unit2(sv);
+        const projection=g[0]*u[0]+g[1]*u[1];
+        const thetaSign=projection>=0?1:-1;
+        const score=Math.abs(projection);
+        const token=tokenForAxisLayer(i,layer,thetaSign);
+        if(!token)return;
+
+        const dir=thetaSign>0?u:[-u[0],-u[1]];
+        if(!best||score>best.score){
+          best={token,dir,score,kind:layer===0?'middle':'outer',layer};
+        }
+      });
+
+      return best;
+    }
+    function makePreview(choice){
+      const m=parseMove(choice.token);
+      const selected=cubies.filter(c=>Math.round(dot(c.pos,m.n))===m.layer);
+      return {choice,m,fraction:0,base:selected.map(c=>({c,pos:c.pos.slice(),ori:c.ori.map(r=>r.slice())}))};
+    }
+    function applyPreview(p,fraction){
+      p.fraction=clamp(fraction,-1.06,1.06);
+      const R=rot(p.m.n,p.m.ang*p.fraction);
+      p.base.forEach(b=>setCubieTransform(b.c,mm(R,b.ori),mv(R,b.pos)));
+    }
+    function settlePreview(p,target){
+      if(!p)return;
+      busy=true;
+      const from=p.fraction,to=target,start=performance.now(),dur=reduced?1:145;
+      function frame(now){
+        const t=clamp((now-start)/dur,0,1);
+        applyPreview(p,from+(to-from)*ease(t));
+        if(t<1){requestAnimationFrame(frame);return}
+        if(target!==0){
+          const token=target===1?p.choice.token:inverseToken(p.choice.token);
+          const Rf=rot(p.m.n,p.m.ang*target);
+          p.base.forEach(b=>{
+            b.c.pos=roundV(mv(Rf,b.pos));b.c.ori=roundM(mm(Rf,b.ori));
+            setCubieTransform(b.c,b.c.ori,b.c.pos);
+          });
+          history.push(token);playerMoves++;
+          if(challenge&&!timerRunning)startTimer();
+          setStatus(`Giro directo ${token}.`,'Gesto');
+        }else{
+          p.base.forEach(b=>setCubieTransform(b.c,b.ori,b.pos));
+          setStatus('Gesto pequeño: la capa regresó a su posición.','Sin giro');
+        }
+        busy=false;renderAll();
+        if(target!==0)maybeSolved();
+        pumpPending();
+      }
+      requestAnimationFrame(frame);
+    }
+    function setStatus(t,c){statusText.textContent=t;statusChip.textContent=c||''}
+    function fmtTime(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`}
+    function stopTimer(){if(timerRunning)elapsed=Math.floor((Date.now()-timerStart)/1000);timerRunning=false;if(timerId){clearInterval(timerId);timerId=null}renderStats()}
+    function startTimer(){if(timerRunning)return;timerRunning=true;timerStart=Date.now()-elapsed*1000;timerId=setInterval(()=>{elapsed=Math.floor((Date.now()-timerStart)/1000);renderStats()},250)}
+    function resetTimer(){stopTimer();elapsed=0;renderStats()}
+    function inverseToken(t){if(t.endsWith('2'))return t;if(t.endsWith("'"))return t[0];return t+"'"}
+    function inverseSeq(s){return s.slice().reverse().map(inverseToken)}
+    function parseMove(token){const face=token[0],info=faceInfo[face];let ang=Math.PI/2;if(token.endsWith("'"))ang=-Math.PI/2;if(token.endsWith('2'))ang=Math.PI;return {face,n:info.n,layer:info.layer,ang}}
+    function lock(v){root.querySelectorAll('[data-lockable="1"],.move-btn').forEach(b=>b.disabled=!!v)}
+    function ease(t){return t*t*t*(t*(6*t-15)+10)}
+    function turn(token,purpose,record,count,done){const m=parseMove(token),sel=cubies.filter(c=>Math.round(dot(c.pos,m.n))===m.layer),base=sel.map(c=>({c,pos:c.pos.slice(),ori:c.ori.map(r=>r.slice())}));const dur=reduced?1:(purpose==='scramble'?80:purpose==='solve'?105:200),start=performance.now();
+      function frame(now){const t=Math.min(1,(now-start)/dur),R=rot(m.n,m.ang*ease(t));base.forEach(b=>setCubieTransform(b.c,mm(R,b.ori),mv(R,b.pos)));if(t<1)requestAnimationFrame(frame);else{const Rf=rot(m.n,m.ang);base.forEach(b=>{b.c.pos=roundV(mv(Rf,b.pos));b.c.ori=roundM(mm(Rf,b.ori));setCubieTransform(b.c,b.c.ori,b.c.pos)});if(record)history.push(token);if(count){playerMoves++;if(challenge&&!timerRunning)startTimer()}renderAll();done&&done()}}
+      requestAnimationFrame(frame)
+    }
+    function runSequence(seq,opts,finished){if(busy||!seq.length){finished&&finished();return}busy=true;if(!opts.quiet)lock(true);queue=seq.slice();function next(){if(!queue.length){busy=false;if(!opts.quiet)lock(false);renderAll();finished&&finished();return}const t=queue.shift();turn(t,opts.purpose,opts.record,opts.count,next)}next()}
+    function generateScramble(n){const fs=['U','D','L','R','F','B'],sufs=['',"'",'2'],axis={U:'y',D:'y',L:'x',R:'x',F:'z',B:'z'};let out=[],last='',lastA='';while(out.length<n){const f=fs[Math.floor(Math.random()*6)];if(f===last)continue;if(axis[f]===lastA&&Math.random()<.55)continue;out.push(f+sufs[Math.floor(Math.random()*3)]);last=f;lastA=axis[f]}return out}
+    function worldFaceOfSticker(c,local){return roundV(mv(c.ori,local)).join(',')}
+    function solved(){const sets={};Object.values(normals).forEach(n=>sets[n.join(',')]=new Set());cubies.forEach(c=>Object.entries(c.stickers).forEach(([color,n])=>{const k=worldFaceOfSticker(c,n);if(sets[k])sets[k].add(color)}));return Object.values(sets).every(s=>s.size===1)}
+    function renderStats(){statMoves.textContent=playerMoves;statTime.textContent=fmtTime(elapsed);statScramble.textContent=currentScramble.length||'—';const ok=solved();statState.textContent=ok?'Resuelto':'Mezclado';statState.style.color=ok?'#15803d':'#0f172a'}
+    let historyKey=null;
+    function renderHistory(){const key=history.length+'|'+history.slice(-30).join(' ');if(key===historyKey)return;historyKey=key;historyBox.innerHTML='';const recent=history.slice(-30);if(!recent.length){historyBox.innerHTML='<span class="history-empty">Sin movimientos todavía.</span>';return}if(history.length>30){const e=document.createElement('span');e.className='history-token';e.textContent='…';historyBox.appendChild(e)}recent.forEach(t=>{const e=document.createElement('span');e.className='history-token';e.textContent=t;historyBox.appendChild(e)})}
+    function renderAll(){renderStats();renderHistory();challengeCard.classList.toggle('on',challenge)}
+    function showSuccess(){stopTimer();let tier='bronze',title='¡Cubo resuelto! · Copa de bronce';if(hintCount===0&&playerMoves<=45){tier='gold';title='¡Cubo resuelto! · Copa de oro'}else if(hintCount===0&&playerMoves<=80){tier='silver';title='¡Cubo resuelto! · Copa de plata'}success.className=`success-card show ${tier}`;successTitle.textContent=title;successText.innerHTML=`Terminaste en <strong>${playerMoves}</strong> movimientos y <strong>${fmtTime(elapsed)}</strong>. ${hintCount===0?'Sin pistas.':`Usaste <strong>${hintCount}</strong> pista(s).`} La copa es una regla de juego, no una afirmación de optimalidad.`}
+    function maybeSolved(){if(!solved())return;setStatus('Las seis caras vuelven a ser uniformes. Cubo resuelto.','✓ Resuelto');if(challenge)showSuccess()}
+    function resetSolved(){stopTimer();build();history=[];scrambleBase=0;currentScramble=[];playerMoves=0;hintCount=0;challenge=false;elapsed=0;success.className='success-card';setStatus('Cubo resuelto. Arrastra un sticker para girar una capa, o el fondo para mover la cámara.','Listo');renderAll()}
+    function scramble(asChallenge){if(busy)return;stopTimer();build();history=[];playerMoves=0;hintCount=0;elapsed=0;challenge=!!asChallenge;success.className='success-card';currentScramble=generateScramble(parseInt(scrambleLen.value,10)||20);setStatus(asChallenge?'Preparando el reto…':'Mezclando el cubo…','Scramble');runSequence(currentScramble,{purpose:'scramble',record:true,count:false},()=>{scrambleBase=history.length;playerMoves=0;elapsed=0;resetTimer();setStatus(asChallenge?'Reto listo. El cronómetro comienza con tu primer giro.':'Cubo mezclado. Intenta resolverlo.','Mezclado');hintText.textContent=asChallenge?'Resuélvelo sin pistas para aspirar a oro o plata.':'Activa el reto para registrar puntuación.';renderAll()})}
+    let pendingMoves=[];
+    function pumpPending(){if(busy||!pendingMoves.length)return;const t=pendingMoves.shift();runSequence([t],{purpose:'user',record:true,count:true,quiet:true},()=>{maybeSolved();pumpPending()})}
+    function userMove(t){if(pendingMoves.length>32)return;pendingMoves.push(t);pumpPending()}
+    function undo(){if(busy)return;if(history.length<=scrambleBase){setStatus('No hay movimientos tuyos para deshacer.','Sin deshacer');return}const last=history[history.length-1];runSequence([inverseToken(last)],{purpose:'solve',record:false,count:false,quiet:true},()=>{history.pop();playerMoves=Math.max(0,playerMoves-1);setStatus(`Se deshizo ${last}.`,'Deshacer');renderAll()})}
+    function solveHistory(){if(busy)return;if(!history.length){setStatus('El cubo ya está resuelto.','✓ Resuelto');return}challenge=false;stopTimer();success.className='success-card';const seq=inverseSeq(history);setStatus(`Ejecutando ${seq.length} movimientos inversos al historial. No se afirma que sea la solución mínima.`,'Resolviendo');runSequence(seq,{purpose:'solve',record:false,count:false},()=>{history=[];scrambleBase=0;currentScramble=[];playerMoves=0;setStatus('Cubo resuelto mediante la inversa del historial.','✓ Resuelto');renderAll()})}
+    function hint(){if(!history.length){hintText.textContent='El cubo ya está resuelto.';return}hintCount++;const t=inverseToken(history[history.length-1]);hintText.innerHTML=`Movimiento garantizado para regresar por el historial: <strong>${t}</strong>. No necesariamente es óptimo.`}
+    function updateAlg(){const a=algorithms[algorithmSelect.value];algorithmSeq.textContent=a.seq.join(' ');algorithmDesc.textContent=a.desc}
+    function runAlg(inv){if(busy)return;const a=algorithms[algorithmSelect.value],seq=inv?inverseSeq(a.seq):a.seq;runSequence(seq,{purpose:'user',record:true,count:true},()=>{setStatus(`${inv?'Inversa de ':''}${a.name} ejecutada.`,'Algoritmo');maybeSolved()})}
+
+    ['U','D','L','R','F','B',"U'","D'","L'","R'","F'","B'",'U2','D2','L2','R2','F2','B2'].forEach(t=>{const b=document.createElement('button');b.type='button';b.className='move-btn'+(t.endsWith("'")?' prime':t.endsWith('2')?' double':'');b.textContent=t;b.dataset.move=t;b.addEventListener('click',()=>userMove(t));movesGrid.appendChild(b)});
+    root.querySelector('#front-view-btn').addEventListener('click',()=>{
+      animateViewTo(-11,16,1.03);
+      setStatus('Vista casi frontal: se conserva un poco de cara superior y lateral para mantener la profundidad.','Vista frontal');
+    });
+    root.querySelector('#scramble-btn').addEventListener('click',()=>scramble(false));root.querySelector('#challenge-btn').addEventListener('click',()=>scramble(true));root.querySelector('#reset-btn').addEventListener('click',resetSolved);root.querySelector('#undo-btn').addEventListener('click',undo);root.querySelector('#solve-btn').addEventListener('click',solveHistory);root.querySelector('#hint-btn').addEventListener('click',hint);root.querySelector('#run-algorithm').addEventListener('click',()=>runAlg(false));root.querySelector('#invert-algorithm').addEventListener('click',()=>runAlg(true));algorithmSelect.addEventListener('change',updateAlg);
+    root.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',()=>{root.querySelectorAll('.tab-btn').forEach(x=>x.classList.toggle('active',x===b));root.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===b.dataset.tab))}));
+    stage.addEventListener('pointerdown',e=>{
+      cancelInertia();
+      if(busy)return;
+      const sticker=e.target.closest&&e.target.closest('.cubie-face.sticker');
+      gesture={mode:sticker?'slice':'camera',id:e.pointerId,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,source:sticker||null,cubie:sticker?sticker._rubikCubie:null,localNormal:sticker?sticker._rubikLocalNormal:null,choice:null,preview:null,targetFrac:0,samples:[{t:performance.now(),x:e.clientX,y:e.clientY}]};
+      if(sticker){
+        sticker.classList.add('drag-source');
+        setStatus('Mantén presionado y arrastra arriba, abajo, izquierda o derecha: moverás la fila o columna que atraviesa este sticker.','Giro directo');
+        e.preventDefault();
+      }
+      try{stage.setPointerCapture&&stage.setPointerCapture(e.pointerId)}catch(err){}
+    });
+    stage.addEventListener('pointermove',e=>{
+      if(!gesture.mode||e.pointerId!==gesture.id)return;
+      if(gesture.mode==='camera'){
+        const dx=e.clientX-gesture.lastX,dy=e.clientY-gesture.lastY;
+        gesture.lastX=e.clientX;gesture.lastY=e.clientY;
+        // Bola de arrastre: cada tramo gira en ejes de pantalla; se puede tumbar el cubo sin limite
+        // y el control nunca se invierte (arrastrar arriba sigue levantando el cubo, como antes).
+        spinView(dx*.45,-dy*.45);applyView();
+        const now=performance.now();
+        gesture.samples.push({t:now,x:e.clientX,y:e.clientY});
+        while(gesture.samples.length>2&&now-gesture.samples[0].t>110)gesture.samples.shift();
+        return;
+      }
+      const dx=e.clientX-gesture.startX,dy=e.clientY-gesture.startY;
+      if(!gesture.choice){
+        gesture.choice=inferStickerDrag(gesture.cubie,gesture.localNormal,dx,dy);
+        if(gesture.choice){
+          gesture.preview=makePreview(gesture.choice);
+          setStatus(`Gesto reconocido: ${gesture.choice.token}. La capa sigue tu mano en los dos sentidos; suelta para completar el giro (o su inverso).`,'Giro directo');
+        }
+      }
+      if(gesture.choice&&gesture.preview){
+        const projection=dx*gesture.choice.dir[0]+dy*gesture.choice.dir[1];
+        gesture.targetFrac=projection/72;
+        ensureFollow();
+      }
+    });
+    function endGesture(e,cancelled){
+      if(!gesture.mode)return;
+      if(gesture.source)gesture.source.classList.remove('drag-source');
+      const mode=gesture.mode,preview=gesture.preview,samples=gesture.samples||[],targetF=gesture.targetFrac;
+      cancelFollow();
+      gesture={mode:null,id:null,startX:0,startY:0,lastX:0,lastY:0,source:null,cubie:null,localNormal:null,choice:null,preview:null,targetFrac:0};
+      if(mode==='camera'&&!cancelled&&samples.length>=2){
+        const now=performance.now(),last=samples[samples.length-1];
+        if(now-last.t<=80){
+          let first=samples[0];
+          for(let i=samples.length-1;i>=0;i--){if(last.t-samples[i].t>=30){first=samples[i];break}}
+          const dt=Math.max(8,last.t-first.t);
+          let path=0;
+          for(let i=1;i<samples.length;i++){
+            if(last.t-samples[i-1].t<=100)path+=Math.hypot(samples[i].x-samples[i-1].x,samples[i].y-samples[i-1].y);
+          }
+          const vx=.45*(last.x-first.x)/dt,vy=-.45*(last.y-first.y)/dt;
+          // La inercia solo se enciende con un lanzamiento deliberado: velocidad sostenida Y recorrido real.
+          // El micro-arrastre de levantar el dedo (roll-off) no pasa los filtros: el cubo queda donde lo soltaste.
+          if(path>=16&&Math.hypot(vx,vy)>=.12)startInertia(vx,vy);
+        }
+      }
+      if(mode==='slice'&&preview){
+        const target=(!cancelled&&targetF>=.27)?1:((!cancelled&&targetF<=-.27)?-1:0);
+        settlePreview(preview,target);
+      }
+    }
+    stage.addEventListener('pointerup',e=>endGesture(e,false));
+    stage.addEventListener('pointercancel',e=>endGesture(e,true));
+    
+    root.addEventListener('keydown',e=>{const tag=(e.target&&e.target.tagName||'').toLowerCase();if(['input','select','button'].includes(tag))return;const k=e.key.toUpperCase();if(!faceInfo[k])return;e.preventDefault();userMove(e.shiftKey?k+"'":k)});
+    root._rubikTest={
+      getView:()=>({m:view.m.map(r=>r.slice()),scale:view.scale}),
+      inertiaOn:()=>inertiaId!==null,
+      screenVec:(v)=>screenVec(v),
+      inverseToken:(t)=>inverseToken(t),
+      getState:()=>({moves:playerMoves,solved:solved(),history:history.slice()}),
+      inferByHome:(home,code,dx,dy)=>{
+        const el=root.querySelector(`.sticker[data-home-pos="${home}"][data-sticker-code="${code}"]`);
+        return el?inferStickerDrag(el._rubikCubie,el._rubikLocalNormal,dx,dy):null;
+      }
+    };
+    updateAlg();viewInit();applyView();resetSolved();
+  })();
+  )---"
+
+ui <- fluidPage(
+  tags$head(
+    tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
+    tags$style(HTML(css))
+  ),
+  HTML(body_html),
+  tags$script(HTML(js))
+)
+
+server <- function(input, output, session) {}
+
+shinyApp(ui, server)

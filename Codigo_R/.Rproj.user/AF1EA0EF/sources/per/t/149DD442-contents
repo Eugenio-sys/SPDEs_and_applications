@@ -1,0 +1,2264 @@
+library(shiny)
+
+# Planímetros de rueda (polar de Amsler y lineal) y el Teorema de Green
+# Toda la lógica vive en JavaScript (misma arquitectura que la app de las Torres de Hanoi).
+# Guardar este archivo en UTF-8.
+
+ui <- fluidPage(
+  tags$head(
+    tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
+    tags$style(HTML("
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+        background: radial-gradient(circle at top, #f8fafc 0%, #e2e8f0 58%, #dbe4ef 100%);
+        color: #0f172a;
+      }
+      .app-shell {
+        max-width: 1260px;
+        margin: 0 auto;
+        padding: 18px;
+      }
+      .hero-card,
+      .board-card,
+      .graph-card,
+      .success-card,
+      .challenge-panel {
+        background: rgba(255,255,255,0.78);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.72);
+        border-radius: 30px;
+        box-shadow: 0 18px 45px rgba(15,23,42,0.10);
+      }
+      .hero-card { padding: 28px; }
+      .board-card, .graph-card { padding: 22px; }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        padding: 7px 12px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+      .hero-title {
+        margin: 14px 0 0;
+        max-width: 860px;
+        font-size: clamp(2rem, 4.2vw, 3.4rem);
+        line-height: 1.02;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        color: #020617;
+      }
+      .hero-subtitle {
+        margin: 14px 0 0;
+        max-width: 860px;
+        font-size: 16px;
+        line-height: 1.75;
+        color: #475569;
+      }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 22px;
+      }
+      .stat-card {
+        border-radius: 24px;
+        border: 1px solid #e2e8f0;
+        background: rgba(255,255,255,0.9);
+        padding: 16px;
+        box-shadow: 0 4px 16px rgba(15,23,42,0.05);
+        min-width: 0;
+      }
+      .stat-label {
+        font-size: 13px;
+        color: #64748b;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .stat-value {
+        font-size: 29px;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .stat-subvalue {
+        margin-top: 6px;
+        min-height: 2.9em;
+        font-size: 12px;
+        color: #64748b;
+        line-height: 1.45;
+      }
+      .play-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.22fr) minmax(320px, 0.78fr);
+        gap: 18px;
+        align-items: start;
+      }
+      .section-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+      .section-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 16px;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 18px;
+        flex: 0 0 auto;
+        box-shadow: 0 8px 18px rgba(15,23,42,0.18);
+      }
+      .section-title {
+        margin: 0;
+        font-size: 25px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+      .section-subtitle {
+        margin: 5px 0 0;
+        font-size: 14px;
+        line-height: 1.7;
+        color: #64748b;
+      }
+      .controls-grid {
+        display: grid;
+        grid-template-columns: 1.15fr 0.9fr 1.05fr auto auto;
+        gap: 12px;
+        align-items: end;
+        margin-bottom: 16px;
+      }
+      .control-box {
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        background: rgba(255,255,255,0.9);
+        padding: 14px 16px;
+      }
+      .control-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #334155;
+      }
+      .control-select {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 14px;
+        padding: 12px 14px;
+        font-size: 15px;
+        font-weight: 700;
+        color: #0f172a;
+        background: #ffffff;
+      }
+      .control-button {
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 14px 18px;
+        font-size: 14px;
+        font-weight: 800;
+        color: #334155;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(15,23,42,0.05);
+        transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+      }
+      .control-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px rgba(15,23,42,0.09);
+        background: #f8fafc;
+      }
+      .control-button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+      .switch-card {
+        min-width: 188px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .switch-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .switch-label-text {
+        font-size: 14px;
+        font-weight: 800;
+        color: #0f172a;
+      }
+      .switch-subtext {
+        margin-top: 4px;
+        font-size: 12px;
+        color: #64748b;
+        line-height: 1.5;
+      }
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 54px;
+        height: 30px;
+        flex: 0 0 auto;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider-switch {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: #cbd5e1;
+        transition: .2s;
+        border-radius: 999px;
+      }
+      .slider-switch:before {
+        position: absolute;
+        content: '';
+        height: 24px;
+        width: 24px;
+        left: 3px;
+        top: 3px;
+        background: white;
+        transition: .2s;
+        border-radius: 50%;
+        box-shadow: 0 4px 10px rgba(15,23,42,0.16);
+      }
+      .switch input:checked + .slider-switch {
+        background: #7c3aed;
+      }
+      .switch input:checked + .slider-switch:before {
+        transform: translateX(24px);
+      }
+      .message-box {
+        margin-top: 14px;
+        min-height: 50px;
+        border-radius: 18px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        padding: 14px 16px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #334155;
+      }
+      .pr-panel {
+        margin-top: 12px;
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        background: rgba(255,255,255,0.9);
+        padding: 14px 16px;
+        box-shadow: 0 4px 14px rgba(15,23,42,0.05);
+      }
+      .pr-panel.pr-on {
+        border-color: #ddd6fe;
+        background: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 100%);
+      }
+      .pr-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .pr-title {
+        margin: 0 0 6px;
+        font-size: 16px;
+        font-weight: 900;
+        color: #0f172a;
+      }
+      .pr-text {
+        margin: 0;
+        max-width: 620px;
+        font-size: 13px;
+        line-height: 1.65;
+        color: #475569;
+      }
+      .pr-legend {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed #e2e8f0;
+        font-size: 12.5px;
+        line-height: 1.65;
+        color: #475569;
+      }
+      .control-button.active {
+        background: #7c3aed;
+        color: #ffffff;
+        border-color: #7c3aed;
+      }
+      .control-button.active:hover { background: #6d28d9; }
+      .challenge-panel {
+        display: none;
+        margin-bottom: 14px;
+        padding: 16px;
+        border-radius: 22px;
+        border: 1px solid #ddd6fe;
+        background: linear-gradient(180deg, #faf5ff 0%, #f5f3ff 100%);
+      }
+      .challenge-grid {
+        display: grid;
+        grid-template-columns: 1fr 190px;
+        gap: 14px;
+        align-items: center;
+      }
+      .challenge-title {
+        margin: 0 0 8px;
+        font-size: 16px;
+        font-weight: 900;
+        color: #581c87;
+      }
+      .challenge-text {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.65;
+        color: #5b21b6;
+      }
+      .challenge-hint {
+        margin-top: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        border: 1px solid #ddd6fe;
+        background: #ffffff;
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #6d28d9;
+      }
+      .challenge-actions {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .mini-board-wrap {
+        border-radius: 20px;
+        border: 1px solid #e9d5ff;
+        background: #ffffff;
+        padding: 10px;
+        box-shadow: 0 4px 12px rgba(91,33,182,0.08);
+      }
+      .mini-board-wrap svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .mini-board-title {
+        margin-bottom: 8px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-weight: 900;
+        color: #7c3aed;
+      }
+      .board-wrap {
+        position: relative;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        border-radius: 30px;
+        border: 1px solid #cbd5e1;
+        background: linear-gradient(180deg, #f1f5f9 0%, #dbe4ef 100%);
+        padding: 12px;
+        overflow: hidden;
+      }
+      .mesa {
+        display: block;
+        width: 100%;
+        aspect-ratio: 3 / 2;
+        border-radius: 22px;
+        background: #ffffff;
+        border: 1px solid #dbe4ef;
+        box-shadow: 0 4px 14px rgba(15,23,42,0.05);
+        cursor: crosshair;
+        touch-action: none;
+      }
+      .legend-row {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 12px;
+        color: #64748b;
+      }
+      .legend-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+      }
+      .legend-dot { width: 10px; height: 10px; border-radius: 999px; flex: 0 0 auto; }
+      .legend-dash { width: 18px; height: 0; border-top: 3px dashed #7c3aed; flex: 0 0 auto; }
+      .graph-shell {
+        border-radius: 26px;
+        border: 1px solid #dbe4ef;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        padding: 14px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+      }
+      .graph-meta {
+        margin-bottom: 10px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #475569;
+      }
+      .graph-box {
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        min-height: 280px;
+        overflow: hidden;
+      }
+      .graph-box svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .formula-box {
+        margin-top: 14px;
+        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        padding: 14px 16px;
+      }
+      .formula-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-weight: 900;
+        color: #64748b;
+        margin-bottom: 8px;
+      }
+      .formula-line {
+        font-size: 13px;
+        line-height: 1.65;
+        color: #475569;
+        margin: 0 0 6px;
+      }
+      .formula-math {
+        font-family: Georgia, Cambria, Times New Roman, serif;
+        font-style: italic;
+        font-size: 16px;
+        color: #0f172a;
+        margin: 6px 0;
+        padding: 8px 12px;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+      .success-card { margin-top: 16px; padding: 16px 18px; }
+      .success-card.gold {
+        border: 1px solid #f5d76e;
+        background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+        color: #92400e;
+      }
+      .success-card.silver {
+        border: 1px solid #cbd5e1;
+        background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+        color: #334155;
+      }
+      .success-card.bronze {
+        border: 1px solid #d6b08a;
+        background: linear-gradient(180deg, #fff7ed 0%, #f7e3d2 100%);
+        color: #7c2d12;
+      }
+      .success-card.note {
+        border: 1px solid #99f6e4;
+        background: linear-gradient(180deg, #f0fdfa 0%, #ccfbf1 100%);
+        color: #134e4a;
+      }
+      .success-card.fail {
+        border: 1px solid #fecaca;
+        background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
+        color: #9f1239;
+      }
+      .success-title {
+        margin: 0 0 6px;
+        font-size: 20px;
+        font-weight: 900;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .cup-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        font-size: 20px;
+        box-shadow: 0 6px 18px rgba(15,23,42,0.10);
+        background: rgba(255,255,255,0.78);
+      }
+      .cup-icon.gold { color: #d97706; }
+      .cup-icon.silver { color: #94a3b8; }
+      .cup-icon.bronze { color: #b45309; }
+      .cup-icon.fail { color: #e11d48; }
+      .cup-icon.note { color: #0f766e; }
+      .success-text {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+      @media (max-width: 1060px) { .play-grid { grid-template-columns: 1fr; } }
+      @media (max-width: 950px) {
+        .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .controls-grid { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 760px) {
+        .app-shell { padding: 12px; }
+        .hero-card, .board-card, .graph-card { padding: 18px; border-radius: 24px; }
+        .board-wrap { padding: 8px; border-radius: 22px; }
+        .mesa { border-radius: 16px; }
+        .stat-value { font-size: 24px; }
+        .graph-box { min-height: 220px; }
+        .challenge-grid { grid-template-columns: 1fr; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .control-button, .slider-switch, .slider-switch:before { transition: none; }
+      }
+    ")),
+    tags$script(HTML("
+    document.addEventListener('DOMContentLoaded', function () {
+      const app = document.getElementById('planimeter-app');
+      if (!app) return;
+
+      const els = {
+        instrumentSelect: document.getElementById('instrument-select'),
+        armSelect: document.getElementById('arm-select'),
+        poleSelect: document.getElementById('pole-select'),
+        poleBox: document.getElementById('pole-box'),
+        resetBtn: document.getElementById('reset-game'),
+        challengeToggle: document.getElementById('challenge-toggle'),
+        challengePanel: document.getElementById('challenge-panel'),
+        challengeGoalBoard: document.getElementById('challenge-goal-board'),
+        challengeText: document.getElementById('challenge-text'),
+        challengeHint: document.getElementById('challenge-hint'),
+        newTargetBtn: document.getElementById('new-target'),
+        message: document.getElementById('message-box'),
+        prToggle: document.getElementById('pr-toggle'),
+        prPanel: document.getElementById('pr-panel'),
+        prLegend: document.getElementById('pr-legend'),
+        canvasWrap: document.getElementById('canvas-wrap'),
+        canvas: document.getElementById('mesa-canvas'),
+        graphBox: document.getElementById('graph-box'),
+        graphMeta: document.getElementById('graph-meta'),
+        legendBoard: document.getElementById('legend-board'),
+        legendGraph: document.getElementById('legend-graph'),
+        statArea: document.getElementById('stat-area'),
+        statAreaSub: document.getElementById('stat-area-sub'),
+        statLabel2: document.getElementById('stat-label-2'),
+        statLabel3: document.getElementById('stat-label-3'),
+        statLabel4: document.getElementById('stat-label-4'),
+        statRead: document.getElementById('stat-read'),
+        statReadSub: document.getElementById('stat-read-sub'),
+        statRho: document.getElementById('stat-rho'),
+        statRhoSub: document.getElementById('stat-rho-sub'),
+        statReach: document.getElementById('stat-reach'),
+        statReachSub: document.getElementById('stat-reach-sub'),
+        success: document.getElementById('success-card'),
+        successTitle: document.getElementById('success-title'),
+        successText: document.getElementById('success-text')
+      };
+
+      // ---------- constantes de la mesa (coordenadas lógicas, eje y hacia arriba) ----------
+      const W = 720;
+      const H = 480;
+      const UNIT = 40;          // 1 u = 40 px lógicos (la cuadrícula)
+      const MIN_SEG = 1.2;      // distancia mínima entre puntos registrados del trazo
+      const CLOSE_WINDOW = 60;  // cruzar los primeros 60 px del trazo cierra la curva
+      const LOOP_MIN_AREA = 0.3 * UNIT * UNIT; // lazos más pequeños se consideran temblor de la mano
+      const LOOP_MIN_LEN = 90;
+      const SNAP_RADIUS = 7;    // volver a menos de 7 px del inicio cierra la curva
+      const RAIL_Y = 0.5 * UNIT;   // altura de la guía del planímetro lineal sobre el borde inferior
+      const WHEEL_R = 0.3 * UNIT;  // radio de la rueda integradora
+      const WHEEL_S = 0.5;         // posición de la rueda: fracción del brazo trazador medida desde el carro / la articulación
+      const POLES = {
+        esquina: { x: 1.5 * UNIT, y: 1.5 * UNIT, label: 'esquina inferior izquierda' },
+        abajo: { x: 9 * UNIT, y: 0.9 * UNIT, label: 'borde inferior, al centro' },
+        centro: { x: 9 * UNIT, y: 6 * UNIT, label: 'centro de la mesa' }
+      };
+      const COLORS = {
+        curve: '#7c3aed',
+        fan: 'rgba(124,58,237,0.10)',
+        wheel: '#0d9488',
+        wheelDark: '#0f766e',
+        start: '#16a34a',
+        goal: '#ef4444',
+        ink: '#0f172a',
+        grid: 'rgba(15,23,42,0.07)',
+        target: 'rgba(239,68,68,0.09)',
+        targetStroke: '#f87171',
+        muted: '#64748b',
+        rail: '#475569',
+        pole: '#b45309',
+        band: 'rgba(124,58,237,0.045)',
+        stripPos: 'rgba(13,148,136,0.16)',
+        stripNeg: 'rgba(245,158,11,0.18)'
+      };
+
+      const state = {
+        L: 7 * UNIT,
+        instrument: 'polar',     // polar (Amsler) | linear (carro en guía recta)
+        poleKey: 'esquina',
+        pole: { x: POLES.esquina.x, y: POLES.esquina.y },
+        mode: 'idle',            // idle | drawing | closing | closed
+        challengeMode: false,
+        target: null,
+        pointerId: null,
+        runId: 0,
+        scale: 1,
+        points: [],
+        cum: [],
+        closingIndex: -1,
+        length: 0,
+        green: 0,
+        samples: [],
+        linear: null,
+        polar: null,
+        crossings: 0,
+        crossPts: [],
+        area: 0,
+        centroid: null
+      };
+
+      // ---------- utilidades geométricas ----------
+      function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+      function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+      function unit(x, y) { const n = Math.hypot(x, y) || 1; return { x: x / n, y: y / n }; }
+      function orient(a, b, c) { return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x); }
+      function segmentIntersection(p1, p2, p3, p4) {
+        const d1 = orient(p3, p4, p1);
+        const d2 = orient(p3, p4, p2);
+        const d3 = orient(p1, p2, p3);
+        const d4 = orient(p1, p2, p4);
+        const cross1 = (d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0);
+        const cross2 = (d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0);
+        if (!cross1 || !cross2) return null;
+        const t = d1 / (d1 - d2);
+        return { x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y) };
+      }
+      function shoelace(poly) {
+        let s = 0;
+        for (let i = 0; i < poly.length; i += 1) {
+          const a = poly[i];
+          const b = poly[(i + 1) % poly.length];
+          s += a.x * b.y - b.x * a.y;
+        }
+        return s / 2;
+      }
+      function polygonCentroid(poly) {
+        let a = 0;
+        let cx = 0;
+        let cy = 0;
+        for (let i = 0; i < poly.length; i += 1) {
+          const p = poly[i];
+          const q = poly[(i + 1) % poly.length];
+          const c = p.x * q.y - q.x * p.y;
+          a += c;
+          cx += (p.x + q.x) * c;
+          cy += (p.y + q.y) * c;
+        }
+        a /= 2;
+        if (Math.abs(a) < 1e-9) {
+          let sx = 0;
+          let sy = 0;
+          poly.forEach(function (p) { sx += p.x; sy += p.y; });
+          return { x: sx / poly.length, y: sy / poly.length };
+        }
+        return { x: cx / (6 * a), y: cy / (6 * a) };
+      }
+      function insidePolygon(poly, P) {
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+          const a = poly[i];
+          const b = poly[j];
+          const crosses = (a.y > P.y) !== (b.y > P.y);
+          if (crosses && P.x < (b.x - a.x) * (P.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+        }
+        return inside;
+      }
+      function polygonPoints() {
+        const pts = state.points;
+        if (pts.length > 2 && dist(pts[0], pts[pts.length - 1]) < 1e-9) return pts.slice(0, -1);
+        return pts.slice();
+      }
+
+      // ---------- formato ----------
+      function fmtU2(v) { return (v / (UNIT * UNIT)).toFixed(2) + ' u²'; }
+      function fmtU(v) { return (v / UNIT).toFixed(2) + ' u'; }
+      function fmtPct(e) { return (e * 100).toFixed(1) + ' %'; }
+      function relErr(reading, ref) { return Math.abs(Math.abs(reading) - Math.abs(ref)) / Math.max(Math.abs(ref), 1e-9); }
+      function referenceArea() { return (state.challengeMode && state.target) ? state.target.area : state.area; }
+      function isClosed() { return state.mode === 'closed'; }
+      function isLinear() { return state.instrument === 'linear'; }
+      function mech() { return isLinear() ? state.linear : state.polar; }
+      function liveReading() { return isLinear() ? linearReading(state.linear) : polarReading(state.polar); }
+      function setMessage(text) { els.message.textContent = text; }
+      function instrumentName() { return isLinear() ? 'planímetro lineal' : 'planímetro polar'; }
+      function idleMessage() {
+        if (isPR()) {
+          return 'Reto de Puerto Rico: sigue la costa de la isla grande con el trazador y suelta al volver al punto de partida. Vieques, Culebra y los cayos no cuentan: solo la isla continental. El brazo (y el polo, en el polar) se ajustan solos si hace falta para alcanzar toda la isla.';
+        }
+        if (isLinear()) {
+          return state.challengeMode
+            ? 'Modo reto con el planímetro lineal: recorre el borde de la figura roja (está dentro de la banda del brazo) y suelta al volver al inicio. La lectura L·ρ se compara con el área real.'
+            : 'Planímetro lineal: el carro desliza por la guía inferior, la rueda va a mitad del brazo y tú llevas el trazador. Dibuja una curva cerrada dentro de la banda sombreada y mira cómo la rueda acumula −∮y dx.';
+        }
+        return state.challengeMode
+          ? 'Modo reto con el planímetro polar: recorre el borde de la figura roja y suelta al volver al inicio. La lectura de la rueda se compara con el área real.'
+          : 'Planímetro polar: el polo está fijo, la articulación recorre la circunferencia de radio L alrededor del polo y la rueda va a mitad del brazo trazador. Dibuja una curva cerrada dentro del disco de alcance (radio 2L). Si rodeas el polo, la lectura necesita la constante del círculo cero.';
+      }
+      function instrumentStart(P) {
+        if (isLinear()) state.linear = makeLinear(P); else state.polar = makePolar(P);
+      }
+      function outZoneMessage() {
+        return isLinear()
+          ? 'Te saliste de la zona de dibujo del planímetro lineal: el carro solo alcanza la banda 0 < y ≤ L sobre la guía. El trazo se borró: dibuja dentro de la banda sombreada (o elige un brazo más largo).'
+          : 'Te saliste de la zona de dibujo del planímetro polar: el brazo llega hasta 2L del polo. El trazo se borró: dibuja dentro del disco sombreado (o acerca el polo, o alarga el brazo).';
+      }
+      function instrumentMove(Q, P) {
+        if (isLinear()) {
+          if (!state.linear) state.linear = makeLinear(Q);
+          linearMove(state.linear, Q, P);
+        } else {
+          if (!state.polar) state.polar = makePolar(Q);
+          polarMove(state.polar, Q, P);
+        }
+      }
+
+      // ---------- planímetro lineal: carro en una guía recta, rueda a mitad del brazo ----------
+      // Con A = (a, 0) en la guía, T = A + L u y la rueda en P = A + s u (eje paralelo al brazo):
+      //   dρ = dP·n = dA·n + s dφ = −(y/L) dx + σ y² dy / (L √(L²−y²)) + s dφ,
+      // donde y es la altura del trazador sobre la guía y σ = ±1 según el lado del carro.
+      // Los dos últimos términos son diferenciales exactas, así que al cerrar la curva L·ρ = −∮ y dx = A (Green).
+      function linearF(h) {
+        const L = state.L;
+        const hh = clamp(h, -L, L);
+        return (L * L / 2) * Math.asin(hh / L) - (hh / 2) * Math.sqrt(Math.max(0, L * L - hh * hh));
+      }
+      function linearPlace(m, T) {
+        const h = T.y - RAIL_Y;
+        const L = state.L;
+        const root = Math.sqrt(Math.max(0, L * L - h * h));
+        const a = T.x + m.sigma * root;
+        m.carriage = { x: a, y: RAIL_Y };
+        m.phi = Math.atan2(h, T.x - a);
+        m.wheel = { x: a + WHEEL_S * (T.x - a), y: RAIL_Y + WHEEL_S * h };
+        m.aMin = Math.min(m.aMin, a);
+        m.aMax = Math.max(m.aMax, a);
+        const last = m.trail[m.trail.length - 1];
+        if (!last || dist(last, m.wheel) >= 0.8) m.trail.push({ x: m.wheel.x, y: m.wheel.y });
+      }
+      function makeLinear(T0) {
+        const h0 = T0.y - RAIL_Y;
+        const reach = h0 > 0 && h0 <= state.L;
+        const m = {
+          sigma: (T0.x >= W / 2) ? -1 : 1,   // carro a la izquierda del trazador (σ = −1) o a la derecha (σ = +1)
+          ydx: 0,
+          rho: 0,
+          phi: 0,
+          phi0: 0,
+          F0: 0,
+          out: !reach,
+          carriage: null,
+          wheel: null,
+          trail: [],
+          aMin: Infinity,
+          aMax: -Infinity,
+          hMax: h0
+        };
+        if (reach) {
+          linearPlace(m, T0);
+          m.phi0 = m.phi;
+          m.F0 = linearF(h0);
+        }
+        return m;
+      }
+      function linearMove(m, Q, P) {
+        if (m.out) return;
+        const hQ = Q.y - RAIL_Y;
+        const hP = P.y - RAIL_Y;
+        m.hMax = Math.max(m.hMax, hP);
+        if (hP <= 0 || hP > state.L) { m.out = true; return; }
+        m.ydx += 0.5 * (hQ + hP) * (P.x - Q.x);   // ∫ y dx exacto sobre el segmento recto
+        linearPlace(m, P);
+        const L = state.L;
+        m.rho = -m.ydx / L + m.sigma * (linearF(hP) - m.F0) / L + WHEEL_S * L * (m.phi - m.phi0);
+      }
+      function linearReading(m) { return (m && !m.out) ? state.L * m.rho : null; }
+      function wheelTurns(m) { return m ? m.rho / (2 * Math.PI * WHEEL_R) : 0; }
+
+      // ---------- planímetro polar (Amsler): polo O fijo, brazo polar OA de longitud L₁ = L, brazo trazador AB de longitud L ----------
+      // Rueda en P = A + s u sobre el brazo trazador, eje paralelo al brazo: dρ = dP·n = dA·n + s dφ.
+      // Identidad del segmento móvil: 2 dS = [T,dT] − [A,dA] + d(T∧A), y dS = L dA·n + (L²/2) dφ, de modo que
+      //   L dρ = ½[T,dT] − ½[A,dA] + ½ d(T∧A) + (Ls − L²/2) dφ,   con [A,dA] = d(O∧A) + L₁² dψ  (A gira alrededor de O).
+      // Salvo ½∫[T,dT] (exacto por tramos rectos), todo son funciones de estado: ρ se calcula sin integrar numéricamente.
+      // Al cerrar con el polo fuera: L·ρ = ½∮(x dy − y dx) = A. Con el polo dentro (ψ y φ dan w vueltas): A = L·ρ + w·π(L₁² + L² − 2Ls).
+      function poleArm() { return state.L; }
+      function polarConstant() {
+        const L = state.L;
+        const L1 = poleArm();
+        const s = WHEEL_S * L;
+        return Math.PI * (L1 * L1 + L * L - 2 * L * s);
+      }
+      function zeroCircleRadius() { return Math.sqrt(Math.max(0, polarConstant() / Math.PI)); }
+      function polarJoint(T, prev) {
+        const O = state.pole;
+        const L1 = poleArm();
+        const L = state.L;
+        const d = dist(O, T);
+        if (d < 1e-6) return prev || null;
+        if (d > L1 + L + 1e-9 || d < Math.abs(L1 - L) - 1e-9) return null;
+        const a = (L1 * L1 - L * L + d * d) / (2 * d);
+        const h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
+        const ex = (T.x - O.x) / d;
+        const ey = (T.y - O.y) / d;
+        const M = { x: O.x + a * ex, y: O.y + a * ey };
+        const A1 = { x: M.x - h * ey, y: M.y + h * ex };   // codo a la izquierda del rayo O→T
+        const A2 = { x: M.x + h * ey, y: M.y - h * ex };
+        if (prev) return dist(A1, prev) <= dist(A2, prev) ? A1 : A2;   // continuidad de la configuración
+        return A1.y >= A2.y ? A1 : A2;                                  // al empezar: el codo más alto, hacia la mesa
+      }
+      function unwrapTo(prev, ang) {
+        let dlt = ang - prev;
+        while (dlt > Math.PI) dlt -= 2 * Math.PI;
+        while (dlt < -Math.PI) dlt += 2 * Math.PI;
+        return prev + dlt;
+      }
+      function polarPlace(m, T, first) {
+        const A = polarJoint(T, first ? null : m.joint);
+        if (!A) { m.out = true; return false; }
+        const O = state.pole;
+        m.joint = A;
+        const psi = Math.atan2(A.y - O.y, A.x - O.x);
+        const phi = Math.atan2(T.y - A.y, T.x - A.x);
+        m.psi = first ? psi : unwrapTo(m.psi, psi);
+        m.phi = first ? phi : unwrapTo(m.phi, phi);
+        m.wheel = { x: A.x + WHEEL_S * (T.x - A.x), y: A.y + WHEEL_S * (T.y - A.y) };
+        m.TA = T.x * A.y - T.y * A.x;   // T∧A
+        m.OA = O.x * A.y - O.y * A.x;   // O∧A: la parte exacta de [A,dA]
+        const last = m.trail[m.trail.length - 1];
+        if (!last || dist(last, m.wheel) >= 0.8) m.trail.push({ x: m.wheel.x, y: m.wheel.y });
+        return true;
+      }
+      function makePolar(T0) {
+        const m = { joint: null, wheel: null, psi: 0, phi: 0, psi0: 0, phi0: 0, TA: 0, TA0: 0, OA: 0, OA0: 0, green: 0, rho: 0, out: false, trail: [], dMax: dist(state.pole, T0), winding: 0 };
+        if (polarPlace(m, T0, true)) {
+          m.psi0 = m.psi;
+          m.phi0 = m.phi;
+          m.TA0 = m.TA;
+          m.OA0 = m.OA;
+        }
+        return m;
+      }
+      function polarMove(m, Q, P) {
+        if (m.out) return;
+        m.dMax = Math.max(m.dMax, dist(state.pole, P));
+        if (!polarPlace(m, P, false)) return;
+        m.green += 0.5 * (Q.x * P.y - P.x * Q.y);   // ½∫(x dy − y dx) exacto sobre el segmento recto
+        const L = state.L;
+        const L1 = poleArm();
+        const s = WHEEL_S * L;
+        m.rho = (m.green - 0.5 * (m.OA - m.OA0) - (L1 * L1 / 2) * (m.psi - m.psi0) + 0.5 * (m.TA - m.TA0) + (L * s - L * L / 2) * (m.phi - m.phi0)) / L;
+        m.winding = Math.round((m.psi - m.psi0) / (2 * Math.PI));
+      }
+      function polarReading(m) {
+        // lectura corregida: L·ρ más la constante del círculo cero por cada vuelta de la articulación alrededor del polo
+        if (!m || m.out) return null;
+        return state.L * m.rho + (isClosed() ? m.winding : 0) * polarConstant();
+      }
+      function polarRaw(m) { return (m && !m.out) ? state.L * m.rho : null; }
+
+      // ---------- reto: el mapa de Puerto Rico (contornos extraídos del mapa municipal SVG; isla grande de 14 u) ----------
+      const PR_REAL_MI2 = 3363;   // isla grande ≈ 8 710 km² (sin Vieques, Culebra, Mona ni los cayos)
+      const PR_REAL_KM2 = 8710;
+      const PR_MAIN = [64.4,173.3,61.7,174.8,57.4,173.3,53.3,171.5,51.4,167.5,51.2,163.1,51.6,158.6,52.7,155.3,57,155.6,58.5,151.6,57.9,148.4,60.6,148.4,61.2,151.3,58.8,153.8,60.2,157.7,64.1,159.7,68.2,158.8,71.6,156.1,75.9,155,80.3,154,84.6,153.1,89.1,153.1,92.7,155.5,94.2,159.5,96.9,157.5,97.5,160.8,101.3,163.1,105.7,163.2,110.2,162.6,114.6,161.5,118.8,160.1,122.7,157.9,121.2,161.7,125.6,161.6,127.9,158.2,130,154.4,133.9,152.3,138,150.2,142,148.2,146.1,146.5,149.7,147.4,146.6,149.5,147.1,152.2,151.3,153,152.5,156.5,148.6,158.1,146.3,159.5,148.2,161.9,151.2,159.2,154.7,159.2,154.6,154.9,158.4,154.5,162.6,154.6,166.2,152.5,169.4,153.8,172.1,155.8,176.1,154.1,180.2,155.6,184.1,157.8,188.3,159.5,192.5,161.2,195.4,164.5,193.5,165.6,190.6,163.1,187.1,164.1,189.8,165.7,189.8,168.9,192.6,169.2,196.4,171.7,200.2,174.2,202.1,171.8,204.9,170.1,204.2,166.3,202.4,164.1,205.1,163.9,207.5,167.8,211.7,168.2,216.2,168.2,219.7,166,223.4,163.7,227.5,161.7,231.5,159.7,235.8,160.4,238.9,163.6,243.1,164.5,247.5,165.3,250.7,162.4,249.8,159.1,253,159.2,257.2,160.7,261.1,159.2,265,158.5,269.3,159.7,273.7,160.8,277.9,162.3,282,164.3,286,166.3,290.4,167.4,294.8,168.2,299.3,168.2,303.6,167.4,307.6,165.4,309.6,161.7,312.7,158.4,316.3,156.9,320.3,155.1,323.8,152.3,327.4,149.5,330.9,151.9,333.9,155.2,336.9,158.6,340.9,160.7,344.3,163.2,348.8,163.5,351.8,161,354.9,158.1,357.9,155,360.1,151.4,363.6,153.1,367.6,151.9,370.8,148.7,374.6,146.6,374.2,150.3,377.4,148.3,379.2,149.1,379.7,153.1,383.2,156,387.2,157.8,391.2,156.4,395.1,154.1,398.1,152,393.9,150.3,389.7,151.9,385.3,152.2,387,148.5,390.6,147,394.9,148.3,399.2,148.9,403.1,146.6,406.8,148.3,410.5,150.9,414.5,152.8,419,153.1,422.6,155.6,426.5,157.7,430.4,159.7,434.5,158.2,438.4,155.9,441.4,155.2,444.8,158,447.5,161.6,451.2,163.5,455.7,163.5,459.8,162,463.5,159.8,467.9,160.4,472.4,161,476.9,161.5,481.4,162.1,485.5,163.1,488.8,166,492.6,168.4,496.4,170.8,500.2,173.2,504.5,174.5,509,174.8,512.3,176,513.2,180.3,512.3,184.4,512.9,188.9,515.5,192,518.9,192,522.6,191.8,524.4,195.5,524,200,527,203,528,207.4,528.9,211.8,530.1,216.1,532.5,219.9,534.4,223.9,537.9,226.6,542,227.9,542.9,231.5,545.8,234.9,549.3,237.1,552.7,236,556.6,234.4,558.9,235,559.1,238.8,562.8,240.9,566.8,242.1,571.1,242.8,574.3,240.2,578.7,240.9,579.7,243.7,578,247.8,576.5,251.3,580.1,252.9,584,250.6,585.4,246.5,587.3,245.3,590,245.6,588.3,246.9,587.8,250.8,591.3,249.4,591.6,252.1,588.3,254.8,586.4,258.7,587.3,262.3,584.6,259.9,580.5,261.1,579,265,581.2,267.7,580.2,269.6,577.9,271.8,580.3,275.4,579.9,279.3,579.7,283.8,579.9,287.7,577.2,291,579.7,293.8,581,297.2,583,299.6,580.9,300.6,581.2,303.3,579.9,303.1,576.8,300.3,575,303.6,573.1,301.3,570.4,298.4,566.8,297.5,562.5,298.5,558.1,299.4,553.7,300.4,550.3,303,549.2,307,545.6,304.9,541.7,303.3,538,305.9,534.3,308.5,531.6,311.7,532,315.4,528.4,313.2,524.4,312,524.3,314.8,525.9,317.3,523.2,316,519.6,313.5,515.9,315.3,513,318.6,508.9,320.6,504.6,321.8,500.2,322.6,496.1,323.9,492.2,326.1,487.9,326.8,483.5,325.8,479.1,326.3,474.7,326.9,470.4,328.3,466.1,329.6,461.6,330.4,458.5,330.3,455.7,326.9,451.6,325.8,447.1,325.8,443.8,328.3,440.9,328.9,436.4,329.6,432,330.4,428.4,333,424.4,333.8,420.2,334.3,415.8,334.8,416,332.8,418.3,331.8,422,332,421.1,331.3,422.8,328.1,426.9,326.8,428.2,323.9,424.2,322.2,420.4,320.1,419.2,323.5,417.4,324.9,413.1,325.7,410.8,329.2,411.3,333.7,409.9,336,408.8,332.4,405.6,329.8,402.2,328.2,399.2,328.6,395.5,330.6,394.7,334.8,391.4,333.3,386.9,333.3,382.4,333.5,377.9,334,373.6,335.3,369.5,337.1,365.2,338.1,361.8,335.4,357.3,335.4,352.8,336,348.7,337.6,344.8,339.9,340.4,340.3,335.9,340.5,331.4,340.8,327,342,322.7,342.3,318.3,341.2,313.9,340.9,309.7,340,307.7,336.1,303.9,334.3,299.4,334.3,295,335.1,290.6,336.1,286.2,337.1,282.3,339.4,278,340.4,273.5,340.9,269,340.8,264.8,340,260.4,340.3,256.1,341.6,251.8,343,247.4,343.4,243,342.6,238.5,341.8,234.1,341,229.8,339.7,225.5,338.2,221.3,336.6,216.9,336.2,212.4,336.2,208,337,203.8,338.7,200,341.1,196,342.8,191.5,342.8,187,342,182.6,341.3,178.1,340.9,174,342.1,169.6,342.6,165.1,342.3,160.7,341.3,156.4,340,151.9,340,147.6,341.4,143.4,342.8,138.9,342.1,134.4,342.4,130.1,343.4,126.1,345.4,122,347.4,117.8,349,113.5,350.2,109.1,351.3,104.6,351.3,100.1,351.3,95.6,351.3,91.1,351.3,86.7,350.8,82.3,350,78.2,348.2,74.2,346.2,71,343,67.8,339.8,67.7,335.6,69,331.3,70.9,327.2,71.8,322.8,72.6,318.4,69.5,316.1,65.8,313.5,62.2,310.8,58.4,308.4,54.3,306.6,50,305.2,45.7,303.9,41.6,302,37.2,301.1,33.4,299.3,34.3,295.1,36.8,291.4,39.7,287.9,40.9,283.6,43.6,280.1,45.3,275.9,49.7,275.3,54.1,274.6,58.2,273.3,60.4,269.3,61.1,265,63.6,261.3,65.6,257.3,66.1,252.9,67.7,248.8,71.2,246,72.7,242,70.3,238.5,67.1,235.3,64,232.1,61.7,229,64,225.1,63,220.9,61.6,217.6,62,213.1,61.8,208.7,58.4,205.9,56.6,202.2,57.4,197.8,58.3,200.1,61.3,197.3,59,194.7,56.7,193,56.4,189,54.1,185.5,55.6,184.3,59.9,182.9,64.2,181.4,65.6,177.8,65.2,174.9,67.9,178.5,67.7,174.6];
+      const PR_MINORS = [[628.8,205,633.5,204.1,637.2,205,637.8,202,641.4,203,643,204.8,645.7,204.1,648.4,206.3,644.5,208.3,647.2,210.6,648.8,207,650.7,209,652.8,209.9,655.5,209.8,659.1,209.7,662.9,210.6,664,210.2,665,214.7,668,214.5,669.2,216.6,673.2,214,675.3,212.5,672.7,210.6,677.1,211.7,678.9,215.4,683.6,215.4,686.8,216.4,688.5,219.2,691.6,216.8,695.9,218,700.4,218.1,697.5,218.5,694.7,221.9,690.7,221.8,686.2,221.9,681.8,223.6,677.1,223.9,672.6,224.5,668.5,225.8,664.1,226.7,659.5,227.6,654.8,227.7,650.1,227.4,645.5,226.7,641.9,224.4,639,222,634.3,222,630.7,220.3,626.2,219.5,622,218.2,617.9,216.7,613.3,215.5,608.9,214.1,605.3,213.2,600.7,213.5,597.1,212.5,597.2,208.4,598.6,204.4,602.4,201.7,606.8,200.1,611.4,199.4,615.9,200.6,619.8,203.1,624.4,204.1],[699.7,275.8,701.6,274.7,701.6,272.3,703.3,273.2,704,274.9,703.1,277.2,703.1,279.2,705.1,278.5,707.2,277.7,707.4,279,706.1,281,704.7,282.8,702.7,284.2,700.8,285.6,698.8,287,696.5,287,694.3,286.2,692.9,287.6,691.2,287.5,689.2,287.1,687.4,287.7,685.7,289,685.3,286.9,683.2,286.2,681.7,287.7,679.9,289,678.2,290.6,677,292,675.7,293.6,674.5,292.3,676,290.3,677.4,288.4,678.9,286.5,679.9,284.5,681.9,283.6,683.6,282.1,683.6,279.7,685.2,278,686.5,276.7,688.9,276.7,688.6,275.2,690.1,273.5,691.5,272.1,692.9,270.5,693.2,268.2,694.7,269.2,694.8,270.1,695.3,271.3,695.7,272.5,694.3,273.3,693.4,273.9,693.6,276,691.4,276.7,689.3,277,688.3,278.5,689.6,279.5,691.8,280.4,693.1,279.4,694.7,278.6,696.8,278.4,695.1,277.7,695.9,275.9,696.8,275.8,698.3,274.8],[277.1,133.5,278.7,135.2,278.7,136.8,277,138.1,275.2,136.6,273.4,135.1,271.7,133.6,270.6,131.6,270,129.4,271.2,129.6,273.2,130.9,275.1,132.2]];
+      function decodePts(flat) {
+        const out = [];
+        for (let i = 0; i < flat.length; i += 2) out.push({ x: flat[i], y: flat[i + 1] });
+        return out;
+      }
+      let prCache = null;
+      function prTarget() {
+        if (!prCache) {
+          const pts = decodePts(PR_MAIN);
+          const area = Math.abs(shoelace(pts));
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+          pts.forEach(function (p) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
+          prCache = {
+            kind: 'pr',
+            name: 'mapa de Puerto Rico',
+            article: 'el',
+            points: pts,
+            area: area,
+            minors: PR_MINORS.map(decodePts),
+            miPerU: Math.sqrt(PR_REAL_MI2 / (area / (UNIT * UNIT))),
+            wU: (maxX - minX) / UNIT,
+            hU: (maxY - minY) / UNIT,
+            maxY: maxY
+          };
+        }
+        return prCache;
+      }
+      function isPR() { return !!(state.challengeMode && state.target && state.target.kind === 'pr'); }
+      function u2ToMi2(v) { const t = prTarget(); return (v / (UNIT * UNIT)) * t.miPerU * t.miPerU; }
+      function fmtMi2(v) { return Math.round(u2ToMi2(v)) + ' mi²'; }
+      function ensurePRReach() {
+        const t = prTarget();
+        const arms = [3, 5, 7, 9, 12].filter(function (a) { return a * UNIT >= state.L; });
+        if (isLinear()) {
+          const needL = t.maxY - RAIL_Y + 14;
+          for (let i = 0; i < arms.length; i += 1) { if (arms[i] * UNIT >= needL) { state.L = arms[i] * UNIT; return; } }
+          state.L = 12 * UNIT;
+          return;
+        }
+        const fits = function (pole, Lpx) {
+          let dm = 0;
+          t.points.forEach(function (p) { const d = dist(pole, p); if (d > dm) dm = d; });
+          return dm + 14 <= 2 * Lpx;
+        };
+        const keys = [state.poleKey, 'abajo', 'centro', 'esquina'];
+        for (let ki = 0; ki < keys.length; ki += 1) {
+          for (let ai = 0; ai < arms.length; ai += 1) {
+            if (fits(POLES[keys[ki]], arms[ai] * UNIT)) {
+              state.poleKey = keys[ki];
+              state.pole = { x: POLES[keys[ki]].x, y: POLES[keys[ki]].y };
+              state.L = arms[ai] * UNIT;
+              return;
+            }
+          }
+        }
+      }
+      function setPRMode(on) {
+        if (!on) { setChallenge(false); return; }
+        state.challengeMode = true;
+        state.target = prTarget();
+        ensurePRReach();
+        resetTrace(true);
+        renderAll();
+      }
+
+
+
+      // ---------- figuras del reto ----------
+      function targetShape(kind, R, cx, cy, rot) {
+        const pts = [];
+        let name = '';
+        let article = 'la';
+        if (kind === 'mancha') {
+          const amps = [0.10 + Math.random() * 0.12, 0.05 + Math.random() * 0.10, Math.random() * 0.06, Math.random() * 0.04];
+          const ph = amps.map(function () { return Math.random() * Math.PI * 2; });
+          for (let i = 0; i < 240; i += 1) {
+            const th = 2 * Math.PI * i / 240;
+            let r = 1;
+            amps.forEach(function (a, k) { r += a * Math.cos((k + 2) * th + ph[k]); });
+            pts.push({ x: cx + R * r * Math.cos(th), y: cy + R * r * Math.sin(th) });
+          }
+          name = 'mancha';
+        } else if (kind === 'elipse') {
+          const a = R * 1.25;
+          const b = R * 0.75;
+          for (let i = 0; i < 240; i += 1) {
+            const th = 2 * Math.PI * i / 240;
+            const x = a * Math.cos(th);
+            const y = b * Math.sin(th);
+            pts.push({ x: cx + x * Math.cos(rot) - y * Math.sin(rot), y: cy + x * Math.sin(rot) + y * Math.cos(rot) });
+          }
+          name = 'elipse';
+        } else if (kind === 'poligono') {
+          const k = 3 + Math.floor(Math.random() * 5);
+          for (let i = 0; i < k; i += 1) {
+            const th = rot + 2 * Math.PI * i / k;
+            pts.push({ x: cx + R * 1.12 * Math.cos(th), y: cy + R * 1.12 * Math.sin(th) });
+          }
+          name = 'polígono de ' + k + ' lados';
+          article = 'el';
+        } else {
+          const k = 5 + Math.floor(Math.random() * 2);
+          const outer = R * 1.2;
+          const inner = outer * 0.55;
+          for (let i = 0; i < 2 * k; i += 1) {
+            const th = rot + Math.PI * i / k;
+            const rr = (i % 2 === 0) ? outer : inner;
+            pts.push({ x: cx + rr * Math.cos(th), y: cy + rr * Math.sin(th) });
+          }
+          name = 'estrella de ' + k + ' puntas';
+        }
+        return { kind: kind, name: name, article: article, points: pts };
+      }
+      function generateTarget() {
+        const kinds = ['mancha', 'elipse', 'poligono', 'estrella'];
+        const kind = kinds[Math.floor(Math.random() * kinds.length)];
+        const rot = Math.random() * Math.PI * 2;
+        const margin = 28;
+        let R = 75 + Math.random() * 45;
+        let cx = W / 2 + (Math.random() - 0.5) * 140;
+        let cy = H / 2 + (Math.random() - 0.5) * 80;
+        let box = { xMin: margin, xMax: W - margin, yMin: margin, yMax: H - margin };
+        if (isLinear()) {
+          box = { xMin: margin, xMax: W - margin, yMin: RAIL_Y + 14, yMax: RAIL_Y + state.L - 14 };
+          R = Math.min(R, (box.yMax - box.yMin) / 2.7);
+          cy = (box.yMin + box.yMax) / 2 + (Math.random() - 0.5) * Math.max(0, Math.min(80, box.yMax - box.yMin - 2.6 * R));
+        } else {
+          // la figura entera debe caber en el disco de alcance: |T − O| ≤ 2L
+          const O = state.pole;
+          const reach = poleArm() + state.L - 24;
+          R = Math.min(R, reach / 2.8);
+          const limitC = reach - 1.3 * R;
+          let ok = false;
+          for (let tries = 0; tries < 60 && !ok; tries += 1) {
+            cx = box.xMin + 1.3 * R + Math.random() * Math.max(1, box.xMax - box.xMin - 2.6 * R);
+            cy = box.yMin + 1.3 * R + Math.random() * Math.max(1, box.yMax - box.yMin - 2.6 * R);
+            ok = dist({ x: cx, y: cy }, O) <= limitC;
+          }
+          if (!ok) {
+            const u = unit(W / 2 - O.x, H / 2 - O.y);
+            cx = O.x + 0.8 * limitC * u.x;
+            cy = O.y + 0.8 * limitC * u.y;
+          }
+        }
+        const shape = targetShape(kind, R, cx, cy, rot);
+        const pts = shape.points;
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        pts.forEach(function (p) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
+        let shiftX = 0;
+        let shiftY = 0;
+        if (minX < box.xMin) shiftX = box.xMin - minX; else if (maxX > box.xMax) shiftX = box.xMax - maxX;
+        if (minY < box.yMin) shiftY = box.yMin - minY; else if (maxY > box.yMax) shiftY = box.yMax - maxY;
+        pts.forEach(function (p) { p.x += shiftX; p.y += shiftY; });
+        return { kind: shape.kind, name: shape.name, article: shape.article, points: pts, area: Math.abs(shoelace(pts)) };
+      }
+      function miniTargetSVG(target) {
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        target.points.forEach(function (p) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
+        const pad = 12;
+        const vw = (maxX - minX) + 2 * pad;
+        const vh = (maxY - minY) + 2 * pad;
+        const coords = target.points.map(function (p) { return (p.x - minX + pad).toFixed(1) + ',' + (maxY - p.y + pad).toFixed(1); }).join(' ');
+        return `<svg viewBox='0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}' aria-label='Figura del reto'><polygon points='${coords}' fill='rgba(239,68,68,0.12)' stroke='#ef4444' stroke-width='2' stroke-linejoin='round'></polygon></svg>`;
+      }
+
+      // ---------- registro del trazo ----------
+      function addTracerPoint(P0) {
+        let P = P0;
+        const pts = state.points;
+        if (!pts.length) {
+          pts.push(P);
+          state.cum.push(0);
+          state.samples.push({ s: 0, green: 0, plan: 0 });
+          instrumentStart(P);
+          if (mech() && mech().out) discardStroke(outZoneMessage());
+          return;
+        }
+        const Q = pts[pts.length - 1];
+        let d = dist(Q, P);
+        if (state.mode === 'drawing' && d < MIN_SEG) return;
+        if (d < 1e-9) return;
+        const T0 = pts[0];
+        let closeIdx = -1;
+        let snap = false;
+        if (state.mode === 'drawing' && state.length >= 100 && dist(P, T0) <= SNAP_RADIUS) snap = true;
+        if (pts.length >= 3) {
+          for (let i = 0; i < pts.length - 2; i += 1) {
+            const X = segmentIntersection(pts[i], pts[i + 1], Q, P);
+            if (!X) continue;
+            if (dist(X, T0) <= 3) continue;
+            const nearStart = state.cum[i + 1] <= CLOSE_WINDOW && state.length >= 100;
+            if (nearStart && state.mode === 'drawing') {
+              // el trazo cruza su propio comienzo: la curva se cierra ahí mismo
+              closeIdx = i;
+              P = X;
+              d = dist(Q, P);
+              break;
+            }
+            // autointersección: se admite; la rueda medirá el área algebraica (cada región con su número de vueltas)
+            const sub = [X];
+            for (let j = i + 1; j < pts.length; j += 1) sub.push(pts[j]);
+            const subArea = Math.abs(shoelace(sub));
+            const subLen = state.length - state.cum[i + 1] + dist(X, pts[i + 1]) + dist(Q, X);
+            if (subArea >= LOOP_MIN_AREA || subLen >= LOOP_MIN_LEN) {
+              state.crossings += 1;
+              if (state.crossPts.length < 40) state.crossPts.push(X);
+            }
+          }
+        }
+        instrumentMove(Q, P);
+        if (mech() && mech().out && state.mode === 'drawing') {
+          discardStroke(outZoneMessage());
+          return;
+        }
+        state.green += 0.5 * ((Q.x - T0.x) * (P.y - T0.y) - (P.x - T0.x) * (Q.y - T0.y));
+        state.length += d;
+        pts.push(P);
+        state.cum.push(state.length);
+        const lr = liveReading();
+        state.samples.push({ s: state.length, green: state.green, plan: lr === null ? (state.samples.length ? state.samples[state.samples.length - 1].plan : 0) : lr });
+        if (closeIdx >= 0) finishStroke(closeIdx);
+        else if (snap) finishStroke(-1);
+      }
+
+      function discardStroke(text) {
+        resetTrace(false);
+        setMessage(text);
+        renderAll();
+      }
+
+      function finishStroke(closeIdx) {
+        state.pointerId = null;
+        if (state.points.length < 4 || state.length < 40) {
+          discardStroke('El trazo fue demasiado corto. Rodea una región más amplia y vuelve al punto de partida.');
+          return;
+        }
+        state.mode = 'closing';
+        state.closingIndex = state.points.length - 1;
+        const pts = state.points;
+        const T0 = pts[0];
+        // camino de cierre: si el trazo cruzó su comienzo, se vuelve sobre los primeros puntos; si no, línea recta al inicio
+        const way = [pts[state.closingIndex]];
+        if (typeof closeIdx === 'number' && closeIdx >= 0) {
+          for (let j = closeIdx; j >= 0; j -= 1) way.push(pts[j]);
+        } else {
+          way.push(T0);
+        }
+        const cum = [0];
+        for (let j = 1; j < way.length; j += 1) cum.push(cum[j - 1] + dist(way[j - 1], way[j]));
+        const D = cum[cum.length - 1];
+        if (D < 0.5) {
+          if (D > 1e-9) addTracerPoint({ x: T0.x, y: T0.y });
+          closeCurve();
+          return;
+        }
+        const duration = Math.min(700, Math.max(140, D * 1.6));
+        const myRun = state.runId;
+        let t0 = null;
+        let nextWp = 1;
+        function frame(ts) {
+          if (state.runId !== myRun) return;
+          if (t0 === null) t0 = ts;
+          const t = Math.min(1, (ts - t0) / duration);
+          const target = t * D;
+          while (nextWp < way.length && cum[nextWp] <= target) {
+            addTracerPoint({ x: way[nextWp].x, y: way[nextWp].y });
+            nextWp += 1;
+          }
+          if (t < 1) {
+            if (nextWp < way.length) {
+              const a = way[nextWp - 1];
+              const b = way[nextWp];
+              const segLen = cum[nextWp] - cum[nextWp - 1];
+              const u = segLen > 0 ? (target - cum[nextWp - 1]) / segLen : 1;
+              addTracerPoint({ x: a.x + u * (b.x - a.x), y: a.y + u * (b.y - a.y) });
+            }
+            renderAll();
+            window.requestAnimationFrame(frame);
+          } else {
+            addTracerPoint({ x: T0.x, y: T0.y });
+            closeCurve();
+          }
+        }
+        window.requestAnimationFrame(frame);
+      }
+
+      function closeCurve() {
+        const poly = polygonPoints();
+        state.area = shoelace(poly);
+        state.centroid = polygonCentroid(poly);
+        state.mode = 'closed';
+        const m = mech();
+        const lr = liveReading();
+        const absA = Math.abs(state.area);
+        if (lr === null) {
+          setMessage(isLinear()
+            ? `Curva cerrada (área por Green: ${fmtU2(absA)}), pero el trazador salió del alcance del brazo: la rueda solo mide si 0 < y ≤ L sobre la guía.`
+            : `Curva cerrada (área por Green: ${fmtU2(absA)}), pero el trazador se alejó del polo más de 2L: el brazo no llega.`);
+        } else {
+          const turns = wheelTurns(m).toFixed(2);
+          let text = `Curva cerrada. Área por Green: ${fmtU2(absA)} · la rueda marcó L·ρ = ${fmtU2(state.L * m.rho)} (ρ = ${fmtU(m.rho)}, ${turns} vueltas)`;
+          if (!isLinear() && m.winding !== 0) {
+            const w = Math.abs(m.winding);
+            text += `. Tu curva rodea el polo${w > 1 ? ' ' + w + ' veces' : ''}: hay que ${m.winding > 0 ? 'sumar' : 'restar'} ${w > 1 ? w + '·' : ''}πR₀² = ${fmtU2(w * polarConstant())} del círculo cero, y queda ${fmtU2(Math.abs(lr))} en valor absoluto`;
+          }
+          text += state.challengeMode
+            ? ` · error frente al área real: ${fmtPct(relErr(lr, referenceArea()))}.`
+            : (isLinear() ? ': la rueda integra −∮y dx exactamente.' : ': la rueda integra ½∮r² dθ alrededor del polo exactamente.');
+          if (state.area < 0) text += ' El signo negativo de ρ solo dice que recorriste en sentido horario; el área se muestra positiva.';
+          if (state.crossings > 0) text += ` Tu curva se cruza a sí misma: la lectura es el área algebraica, con cada región contada según su número de vueltas.`;
+          setMessage(text + ' Toca la mesa para dibujar otra curva.');
+        }
+        renderAll();
+      }
+
+      // ---------- estado general ----------
+      function resetTrace(announce) {
+        state.runId += 1;
+        state.mode = 'idle';
+        state.pointerId = null;
+        state.points = [];
+        state.cum = [];
+        state.closingIndex = -1;
+        state.length = 0;
+        state.green = 0;
+        state.samples = [];
+        state.linear = null;
+        state.polar = null;
+        state.crossings = 0;
+        state.crossPts = [];
+        state.area = 0;
+        state.centroid = null;
+        if (announce !== false) setMessage(idleMessage());
+      }
+
+      function newTarget() {
+        state.target = generateTarget();
+        resetTrace(true);
+        renderAll();
+      }
+
+      function setChallenge(on) {
+        state.challengeMode = on;
+        if (on) {
+          newTarget();
+        } else {
+          state.target = null;
+          resetTrace(true);
+          renderAll();
+        }
+      }
+
+      // ---------- lienzo ----------
+      function resizeCanvas() {
+        const canvas = els.canvas;
+        const rect = canvas.getBoundingClientRect();
+        const cssW = rect.width || 720;
+        const cssH = cssW * H / W;
+        canvas.style.height = cssH + 'px';
+        const dpr = window.devicePixelRatio || 1;
+        const w = Math.max(1, Math.round(cssW * dpr));
+        const h = Math.max(1, Math.round(cssH * dpr));
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+        state.scale = w / W;
+        scheduleRender();
+      }
+
+      function eventToMath(e) {
+        const rect = els.canvas.getBoundingClientRect();
+        const rw = rect.width || 1;
+        const rh = rect.height || (rw * H / W);
+        const x = (e.clientX - rect.left) * W / rw;
+        const y = (e.clientY - rect.top) * H / rh;
+        return { x: clamp(x, 0, W), y: clamp(H - y, 0, H) };
+      }
+
+      function sx(x) { return x; }
+      function sy(y) { return H - y; }
+
+      function tracePath(ctx, pts) {
+        ctx.moveTo(sx(pts[0].x), sy(pts[0].y));
+        for (let i = 1; i < pts.length; i += 1) ctx.lineTo(sx(pts[i].x), sy(pts[i].y));
+      }
+      function strokePath(ctx, pts, color, width, alpha) {
+        if (pts.length < 2) return;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        tracePath(ctx, pts);
+        ctx.stroke();
+        ctx.restore();
+      }
+      function drawDot(ctx, p, r, color) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(sx(p.x), sy(p.y), r, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+        ctx.restore();
+      }
+      function drawSquare(ctx, p, size, color) {
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(sx(p.x) - size / 2, sy(p.y) - size / 2, size, size);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+      function drawCross(ctx, p, color) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sx(p.x) - 7, sy(p.y) - 7);
+        ctx.lineTo(sx(p.x) + 7, sy(p.y) + 7);
+        ctx.moveTo(sx(p.x) - 7, sy(p.y) + 7);
+        ctx.lineTo(sx(p.x) + 7, sy(p.y) - 7);
+        ctx.stroke();
+        ctx.restore();
+      }
+      function roundRectPath(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.arcTo(x + w, y, x + w, y + r, r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + r, y + h);
+        ctx.arcTo(x, y + h, x, y + h - r, r);
+        ctx.lineTo(x, y + r);
+        ctx.arcTo(x, y, x + r, y, r);
+        ctx.closePath();
+      }
+      function drawPill(ctx, text, cx, cy, fill, color) {
+        ctx.save();
+        ctx.font = '700 13px Inter, ui-sans-serif, system-ui, sans-serif';
+        const tw = ctx.measureText(text).width;
+        const pw = tw + 28;
+        const ph = 30;
+        roundRectPath(ctx, cx - pw / 2, cy - ph / 2, pw, ph, 15);
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(15,23,42,0.08)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, cx, cy + 1);
+        ctx.restore();
+      }
+      function drawGrid(ctx) {
+        ctx.save();
+        ctx.strokeStyle = COLORS.grid;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x <= W; x += UNIT) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); }
+        for (let y = 0; y <= H; y += UNIT) { ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); }
+        ctx.stroke();
+        ctx.restore();
+      }
+      function drawTarget(ctx, target) {
+        ctx.save();
+        ctx.beginPath();
+        tracePath(ctx, target.points);
+        ctx.closePath();
+        ctx.fillStyle = COLORS.target;
+        ctx.fill();
+        ctx.setLineDash([8, 6]);
+        ctx.strokeStyle = COLORS.targetStroke;
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        ctx.restore();
+      }
+      function drawRailAndBand(ctx) {
+        const yTop = RAIL_Y + state.L;
+        ctx.save();
+        // banda de alcance 0 < y ≤ L sobre la guía
+        ctx.fillStyle = COLORS.band;
+        ctx.fillRect(0, sy(Math.min(yTop, H)), W, sy(RAIL_Y) - sy(Math.min(yTop, H)));
+        ctx.setLineDash([6, 6]);
+        ctx.strokeStyle = 'rgba(124,58,237,0.35)';
+        ctx.lineWidth = 1.2;
+        if (yTop < H) {
+          ctx.beginPath();
+          ctx.moveTo(0, sy(yTop) + 0.5);
+          ctx.lineTo(W, sy(yTop) + 0.5);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = 'rgba(124,58,237,0.7)';
+          ctx.font = '700 11px Inter, ui-sans-serif, system-ui, sans-serif';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText('alcance del brazo: y = L', W - 12, sy(yTop) - 3);
+        }
+        // guía (riel con rayado)
+        ctx.setLineDash([]);
+        ctx.strokeStyle = COLORS.rail;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, sy(RAIL_Y));
+        ctx.lineTo(W, sy(RAIL_Y));
+        ctx.stroke();
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        for (let x = 6; x < W; x += 12) { ctx.moveTo(x, sy(RAIL_Y) + 2); ctx.lineTo(x - 5, sy(RAIL_Y) + 8); }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = COLORS.rail;
+        ctx.font = '700 11px Inter, ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('guía del carro', 12, sy(RAIL_Y) - 4);
+        ctx.restore();
+      }
+      function drawStrips(ctx, pts) {
+        // franjas verticales entre el trazo y la guía: −∮ y dx por tramos; verde azulado suma (dx < 0), ámbar resta (dx > 0)
+        if (pts.length < 2) return;
+        const runs = { pos: [], neg: [] };
+        let start = 0;
+        let sign = 0;
+        for (let i = 1; i <= pts.length; i += 1) {
+          const sgn = i < pts.length ? Math.sign(pts[i].x - pts[i - 1].x) : 0;
+          if (i < pts.length && (sgn === 0 || sgn === sign)) continue;
+          if (sign !== 0 && i - 1 > start) (sign < 0 ? runs.pos : runs.neg).push(pts.slice(start, i));
+          start = i - 1;
+          sign = sgn;
+        }
+        [['pos', COLORS.stripPos], ['neg', COLORS.stripNeg]].forEach(function (pair) {
+          const list = runs[pair[0]];
+          if (!list.length) return;
+          ctx.save();
+          ctx.fillStyle = pair[1];
+          ctx.beginPath();
+          list.forEach(function (run) {
+            ctx.moveTo(sx(run[0].x), sy(RAIL_Y));
+            run.forEach(function (p) { ctx.lineTo(sx(p.x), sy(p.y)); });
+            ctx.lineTo(sx(run[run.length - 1].x), sy(RAIL_Y));
+            ctx.closePath();
+          });
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+      function drawLinearMechanism(ctx, T, m) {
+        if (!m || !m.carriage) return;
+        const A = m.carriage;
+        const Pw = m.wheel;
+        const u = unit(T.x - A.x, T.y - A.y);
+        const n = { x: -u.y, y: u.x };
+        if (m.trail.length > 1) strokePath(ctx, m.trail, COLORS.wheel, 2, 0.8);
+        ctx.save();
+        // brazo
+        ctx.globalAlpha = m.out ? 0.35 : 0.9;
+        ctx.strokeStyle = COLORS.ink;
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sx(A.x), sy(A.y));
+        ctx.lineTo(sx(T.x), sy(T.y));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        // carro sobre la guía
+        ctx.fillStyle = COLORS.rail;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        roundRectPath(ctx, sx(A.x) - 11, sy(A.y) - 7, 22, 14, 4);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        drawWheelTop(ctx, Pw, n, m.rho / WHEEL_R);
+        drawDot(ctx, T, 6.5, COLORS.ink);
+      }
+      function drawWheelTop(ctx, Pw, n, theta) {
+        // rueda vista desde arriba: llanta perpendicular al brazo, eje a lo largo del brazo
+        ctx.save();
+        ctx.strokeStyle = COLORS.wheelDark;
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sx(Pw.x - WHEEL_R * n.x), sy(Pw.y - WHEEL_R * n.y));
+        ctx.lineTo(sx(Pw.x + WHEEL_R * n.x), sy(Pw.y + WHEEL_R * n.y));
+        ctx.stroke();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(sx(Pw.x - (WHEEL_R - 2) * n.x), sy(Pw.y - (WHEEL_R - 2) * n.y));
+        ctx.lineTo(sx(Pw.x + (WHEEL_R - 2) * n.x), sy(Pw.y + (WHEEL_R - 2) * n.y));
+        ctx.stroke();
+        // marca en la llanta: desde arriba se ve oscilar a lo largo de la llanta (blanca arriba, oscura cuando toca el papel)
+        const mk = { x: Pw.x + WHEEL_R * Math.sin(theta) * n.x, y: Pw.y + WHEEL_R * Math.sin(theta) * n.y };
+        ctx.beginPath();
+        ctx.arc(sx(mk.x), sy(mk.y), 3.2, 0, 2 * Math.PI);
+        if (Math.cos(theta) >= 0) { ctx.fillStyle = '#ffffff'; ctx.fill(); }
+        else { ctx.fillStyle = COLORS.wheelDark; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1; ctx.stroke(); }
+        ctx.restore();
+      }
+      function drawWheelDial(ctx, m) {
+        // la rueda de frente: graduación que gira con ρ, índice fijo arriba
+        const cx = W - 66;
+        const cy = 66;
+        const R = 44;
+        const theta = m ? m.rho / WHEEL_R : 0;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.beginPath();
+        ctx.arc(0, 0, R + 6, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(255,255,255,0.94)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(15,23,42,0.12)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.save();
+        ctx.rotate(-theta);   // ρ > 0 gira en sentido antihorario
+        ctx.beginPath();
+        ctx.arc(0, 0, R, 0, 2 * Math.PI);
+        ctx.strokeStyle = COLORS.wheelDark;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.strokeStyle = COLORS.ink;
+        ctx.fillStyle = COLORS.ink;
+        ctx.font = '700 9px Inter, ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let k = 0; k < 100; k += 1) {
+          const ang = -Math.PI / 2 + 2 * Math.PI * k / 100;
+          const major = k % 10 === 0;
+          const len = major ? 9 : (k % 5 === 0 ? 6 : 3.5);
+          ctx.lineWidth = major ? 1.6 : 0.8;
+          ctx.beginPath();
+          ctx.moveTo((R - 2) * Math.cos(ang), (R - 2) * Math.sin(ang));
+          ctx.lineTo((R - 2 - len) * Math.cos(ang), (R - 2 - len) * Math.sin(ang));
+          ctx.stroke();
+          if (major) ctx.fillText(String(k / 10), (R - 19) * Math.cos(ang), (R - 19) * Math.sin(ang));
+        }
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = COLORS.wheelDark;
+        ctx.fill();
+        ctx.restore();
+        // índice fijo
+        ctx.fillStyle = COLORS.goal;
+        ctx.beginPath();
+        ctx.moveTo(0, -R + 1);
+        ctx.lineTo(-5, -R - 7);
+        ctx.lineTo(5, -R - 7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        ctx.save();
+        ctx.fillStyle = COLORS.wheelDark;
+        ctx.font = '800 11px Inter, ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const turns = m ? wheelTurns(m) : 0;
+        ctx.fillText((m && m.out) ? 'fuera de alcance' : ((m ? (m.rho / UNIT).toFixed(2) : '0.00') + ' u · ' + turns.toFixed(2) + ' vueltas'), cx, cy + R + 12);
+        ctx.restore();
+      }
+
+      function drawPoleAndReach(ctx) {
+        const O = state.pole;
+        const L = state.L;
+        const L1 = poleArm();
+        const R0 = zeroCircleRadius();
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(sx(O.x), sy(O.y), L1 + L, 0, 2 * Math.PI);
+        ctx.fillStyle = COLORS.band;
+        ctx.fill();
+        ctx.setLineDash([6, 6]);
+        ctx.strokeStyle = 'rgba(124,58,237,0.35)';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(sx(O.x), sy(O.y), L1, 0, 2 * Math.PI);
+        ctx.setLineDash([3, 5]);
+        ctx.strokeStyle = 'rgba(71,85,105,0.55)';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        if (Math.abs(R0 - L1) > 0.5) {
+          ctx.beginPath();
+          ctx.arc(sx(O.x), sy(O.y), R0, 0, 2 * Math.PI);
+          ctx.setLineDash([2, 4]);
+          ctx.strokeStyle = 'rgba(180,83,9,0.6)';
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        ctx.font = '700 11px Inter, ui-sans-serif, system-ui, sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(124,58,237,0.75)';
+        const rx = O.x + (L1 + L) * 0.72;
+        const ry = O.y + (L1 + L) * 0.69;
+        if (rx < W - 150 && ry < H - 12) ctx.fillText('alcance del trazador: radio 2L', sx(rx) + 6, sy(ry));
+        ctx.fillStyle = 'rgba(71,85,105,0.85)';
+        const jx = O.x + L1 * 0.72;
+        const jy = O.y + L1 * 0.69;
+        if (jy < H - 12 && jx < W - 200) ctx.fillText(Math.abs(R0 - L1) > 0.5 ? 'articulación (radio L)' : 'articulación · círculo cero (radio L)', sx(jx) + 6, sy(jy));
+        // polo: pivote fijo
+        ctx.beginPath();
+        ctx.arc(sx(O.x), sy(O.y), 9, 0, 2 * Math.PI);
+        ctx.fillStyle = COLORS.pole;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(sx(O.x), sy(O.y), 3, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.fillStyle = COLORS.pole;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('polo', sx(O.x) + 12, sy(O.y) - 6);
+        ctx.restore();
+      }
+      function drawFan(ctx, pts) {
+        // sectores desde el polo: ½ r² dθ por tramos; antihorario suma (verde azulado), horario resta (ámbar)
+        if (pts.length < 2) return;
+        const O = state.pole;
+        const runs = { pos: [], neg: [] };
+        let start = 0;
+        let sign = 0;
+        for (let i = 1; i <= pts.length; i += 1) {
+          let sgn = 0;
+          if (i < pts.length) {
+            const a = pts[i - 1];
+            const b = pts[i];
+            sgn = Math.sign((a.x - O.x) * (b.y - O.y) - (b.x - O.x) * (a.y - O.y));
+          }
+          if (i < pts.length && (sgn === 0 || sgn === sign)) continue;
+          if (sign !== 0 && i - 1 > start) (sign > 0 ? runs.pos : runs.neg).push(pts.slice(start, i));
+          start = i - 1;
+          sign = sgn;
+        }
+        [['pos', COLORS.stripPos], ['neg', COLORS.stripNeg]].forEach(function (pair) {
+          const list = runs[pair[0]];
+          if (!list.length) return;
+          ctx.save();
+          ctx.fillStyle = pair[1];
+          ctx.beginPath();
+          list.forEach(function (run) {
+            ctx.moveTo(sx(O.x), sy(O.y));
+            run.forEach(function (p) { ctx.lineTo(sx(p.x), sy(p.y)); });
+            ctx.closePath();
+          });
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+      function drawPolarMechanism(ctx, T, m) {
+        if (!m || !m.joint) return;
+        const O = state.pole;
+        const A = m.joint;
+        const u = unit(T.x - A.x, T.y - A.y);
+        const n = { x: -u.y, y: u.x };
+        if (m.trail.length > 1) strokePath(ctx, m.trail, COLORS.wheel, 2, 0.8);
+        ctx.save();
+        ctx.globalAlpha = m.out ? 0.35 : 0.9;
+        ctx.lineCap = 'round';
+        // brazo polar
+        ctx.strokeStyle = COLORS.rail;
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(sx(O.x), sy(O.y));
+        ctx.lineTo(sx(A.x), sy(A.y));
+        ctx.stroke();
+        // brazo trazador
+        ctx.strokeStyle = COLORS.ink;
+        ctx.beginPath();
+        ctx.moveTo(sx(A.x), sy(A.y));
+        ctx.lineTo(sx(T.x), sy(T.y));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        // articulación
+        ctx.beginPath();
+        ctx.arc(sx(A.x), sy(A.y), 5.5, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = COLORS.rail;
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+        ctx.restore();
+        drawWheelTop(ctx, m.wheel, n, m.rho / WHEEL_R);
+        drawDot(ctx, T, 6.5, COLORS.ink);
+      }
+      function drawPRMap(ctx) {
+        drawTarget(ctx, state.target);
+        ctx.save();
+        ctx.fillStyle = 'rgba(100,116,139,0.20)';
+        ctx.strokeStyle = 'rgba(100,116,139,0.55)';
+        ctx.lineWidth = 1;
+        state.target.minors.forEach(function (poly) {
+          ctx.beginPath();
+          tracePath(ctx, poly);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        });
+        ctx.fillStyle = 'rgba(100,116,139,0.85)';
+        ctx.font = '700 11px Inter, ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText('Vieques, Culebra y los cayos no cuentan: solo la isla grande', W - 12, H - 10);
+        ctx.restore();
+      }
+      function drawHint(ctx) {
+        let text = null;
+        const m = mech();
+        if (state.mode === 'idle' && !state.points.length) {
+          if (isPR()) text = 'Sigue la costa de la isla grande y vuelve al punto de partida';
+          else if (state.challengeMode) text = 'Recorre el contorno de la figura y vuelve al inicio';
+          else text = isLinear() ? 'Mantén presionado y dibuja dentro de la banda del brazo' : 'Mantén presionado y dibuja dentro del disco de alcance';
+        }
+        else if (state.mode === 'closed') text = (m && m.out) ? (isLinear() ? 'Fuera de alcance: dibuja dentro de la banda o alarga el brazo' : 'Fuera de alcance: acerca la figura al polo o alarga el brazo') : 'La rueda midió el área · toca la mesa para otra curva';
+        if (text) drawPill(ctx, text, W / 2, 26, 'rgba(255,255,255,0.92)', '#334155');
+      }
+      function drawScaleLabel(ctx) {
+        ctx.save();
+        ctx.fillStyle = COLORS.muted;
+        ctx.font = '700 11px Inter, ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        const text = isLinear()
+          ? '1 cuadro = 1 u · brazo L = ' + (state.L / UNIT) + ' u · rueda r = ' + (WHEEL_R / UNIT) + ' u a mitad del brazo · guía en y = ' + (RAIL_Y / UNIT) + ' u'
+          : '1 cuadro = 1 u · brazos L₁ = L = ' + (state.L / UNIT) + ' u · rueda r = ' + (WHEEL_R / UNIT) + ' u a mitad del brazo trazador · polo en (' + (state.pole.x / UNIT) + ', ' + (state.pole.y / UNIT) + ') u';
+        ctx.fillText(text, 12, H - 10);
+        ctx.restore();
+      }
+
+      function drawCanvas() {
+        const canvas = els.canvas;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const s = state.scale;
+        ctx.setTransform(s, 0, 0, s, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+        drawGrid(ctx);
+        const linear = isLinear();
+        if (linear) drawRailAndBand(ctx); else drawPoleAndReach(ctx);
+        if (state.challengeMode && state.target) {
+          if (isPR()) drawPRMap(ctx); else drawTarget(ctx, state.target);
+        }
+        const pts = state.points;
+        if (linear) drawStrips(ctx, pts); else drawFan(ctx, pts);
+        if (pts.length > 1) {
+          const ci = state.closingIndex;
+          if (ci > 0 && ci < pts.length - 1) {
+            strokePath(ctx, pts.slice(0, ci + 1), COLORS.curve, 3, 1);
+            ctx.save();
+            ctx.setLineDash([7, 6]);
+            strokePath(ctx, pts.slice(ci), COLORS.curve, 2.4, 0.9);
+            ctx.restore();
+          } else {
+            strokePath(ctx, pts, COLORS.curve, 3, 1);
+          }
+        }
+        state.crossPts.forEach(function (X) { drawCross(ctx, X, '#d97706'); });
+        if (pts.length) drawDot(ctx, pts[0], 6, COLORS.start);
+        if (pts.length) {
+          if (linear) drawLinearMechanism(ctx, pts[pts.length - 1], state.linear);
+          else drawPolarMechanism(ctx, pts[pts.length - 1], state.polar);
+        }
+        drawWheelDial(ctx, mech());
+        drawHint(ctx);
+        drawScaleLabel(ctx);
+      }
+
+      // ---------- gráfica de la integral de línea ----------
+      function niceStep(range, count) {
+        const raw = range / Math.max(1, count);
+        const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+        const norm = raw / mag;
+        let step;
+        if (norm <= 1) step = 1; else if (norm <= 2) step = 2; else if (norm <= 2.5) step = 2.5; else if (norm <= 5) step = 5; else step = 10;
+        return step * mag;
+      }
+      function ticks(min, max, count) {
+        const step = niceStep(max - min, count);
+        const out = [];
+        for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) out.push(Math.abs(v) < 1e-12 ? 0 : v);
+        return out;
+      }
+      function fmtTick(v) {
+        const a = Math.abs(v);
+        if (a >= 100) return v.toFixed(0);
+        if (a >= 10) return v.toFixed(1);
+        return v.toFixed(2).replace(/0+$/, '').replace(/[.]$/, '');
+      }
+      function downsample(arr, maxN) {
+        if (arr.length <= maxN) return arr;
+        const k = Math.ceil(arr.length / maxN);
+        const out = [];
+        for (let i = 0; i < arr.length; i += k) out.push(arr[i]);
+        if (out[out.length - 1] !== arr[arr.length - 1]) out.push(arr[arr.length - 1]);
+        return out;
+      }
+
+
+      function renderChart() {
+        const width = 500;
+        const height = 340;
+        const padL = 50;
+        const padR = 16;
+        const padT = 18;
+        const padB = 38;
+        const toU = 1 / UNIT;
+        const toU2 = 1 / (UNIT * UNIT);
+        const FONT = 'Inter, system-ui, sans-serif';
+        if (state.samples.length < 2) {
+          els.graphBox.innerHTML = `<svg viewBox='0 0 ${width} ${height}' aria-label='Integral de línea'><rect x='0' y='0' width='100%' height='100%' fill='#ffffff'></rect><text x='${width / 2}' y='${height / 2 - 8}' text-anchor='middle' font-size='14' font-weight='700' fill='#94a3b8' font-family='${FONT}'>Dibuja una curva para ver la integral en vivo</text><text x='${width / 2}' y='${height / 2 + 14}' text-anchor='middle' font-size='12' fill='#cbd5e1' font-family='${FONT}'>eje x: longitud recorrida (u) · eje y: área acumulada (u²)</text></svg>`;
+          const instr = isLinear() ? 'planímetro lineal (rueda a mitad del brazo)' : `planímetro polar (polo en ${POLES[state.poleKey].label})`;
+          els.graphMeta.innerHTML = state.challengeMode && state.target
+            ? `Reto: <strong>${state.target.name}</strong> de <strong>${fmtU2(state.target.area)}</strong> · brazo L = <strong>${state.L / UNIT} u</strong> · ${instr}.`
+            : `Brazo L = <strong>${state.L / UNIT} u</strong> · mesa de 18 u × 12 u · ${instr}.`;
+          return;
+        }
+        const xmin = 0;
+        let xmax = Math.max(state.length, 1) * toU;
+        let ymin = 0;
+        let ymax = 0;
+        state.samples.forEach(function (sm) {
+          ymin = Math.min(ymin, sm.green * toU2, sm.plan * toU2);
+          ymax = Math.max(ymax, sm.green * toU2, sm.plan * toU2);
+        });
+        const closed = isClosed();
+        const sign = state.area < 0 ? -1 : 1;
+        if (closed) { ymin = Math.min(ymin, state.area * toU2); ymax = Math.max(ymax, state.area * toU2); }
+        const targetLine = (state.challengeMode && state.target) ? sign * state.target.area * toU2 : null;
+        if (targetLine !== null) { ymin = Math.min(ymin, targetLine); ymax = Math.max(ymax, targetLine); }
+        const m = mech();
+        const zeroLine = (!isLinear() && closed && m && !m.out && m.winding !== 0) ? (state.area - m.winding * polarConstant()) * toU2 : null;
+        if (zeroLine !== null) { ymin = Math.min(ymin, zeroLine); ymax = Math.max(ymax, zeroLine); }
+        const span = Math.max(ymax - ymin, 0.5);
+        ymin -= span * 0.08;
+        ymax += span * 0.08;
+        if (xmax - xmin < 1e-9) xmax = xmin + 1;
+        const X = function (x) { return padL + (x - xmin) / (xmax - xmin) * (width - padL - padR); };
+        const Y = function (y) { return height - padB - (y - ymin) / (ymax - ymin) * (height - padT - padB); };
+        const parts = [];
+        parts.push(`<svg viewBox='0 0 ${width} ${height}' aria-label='Integral de línea en vivo'>`);
+        parts.push(`<rect x='0' y='0' width='100%' height='100%' fill='#ffffff'></rect>`);
+        ticks(ymin, ymax, 5).forEach(function (v) {
+          parts.push(`<line x1='${padL}' y1='${Y(v).toFixed(1)}' x2='${width - padR}' y2='${Y(v).toFixed(1)}' stroke='${v === 0 ? '#94a3b8' : '#eef2f7'}' stroke-width='${v === 0 ? 1.2 : 1}'></line>`);
+          parts.push(`<text x='${padL - 8}' y='${(Y(v) + 4).toFixed(1)}' text-anchor='end' font-size='11' fill='#64748b' font-family='${FONT}'>${fmtTick(v)}</text>`);
+        });
+        ticks(xmin, xmax, 5).forEach(function (v) {
+          parts.push(`<line x1='${X(v).toFixed(1)}' y1='${padT}' x2='${X(v).toFixed(1)}' y2='${height - padB}' stroke='${v === 0 ? '#cbd5e1' : '#f1f5f9'}' stroke-width='1'></line>`);
+          parts.push(`<text x='${X(v).toFixed(1)}' y='${height - padB + 16}' text-anchor='middle' font-size='11' fill='#64748b' font-family='${FONT}'>${fmtTick(v)}</text>`);
+        });
+        parts.push(`<text x='${(padL + width - padR) / 2}' y='${height - 6}' text-anchor='middle' font-size='11' font-weight='700' fill='#94a3b8' font-family='${FONT}'>longitud recorrida (u)</text>`);
+        parts.push(`<text x='12' y='${padT - 4}' text-anchor='start' font-size='11' font-weight='700' fill='#94a3b8' font-family='${FONT}'>u²</text>`);
+        if (closed) {
+          parts.push(`<line x1='${padL}' y1='${Y(state.area * toU2).toFixed(1)}' x2='${width - padR}' y2='${Y(state.area * toU2).toFixed(1)}' stroke='#7c3aed' stroke-width='1.4' stroke-dasharray='5 4' opacity='0.7'></line>`);
+        }
+        if (zeroLine !== null) {
+          parts.push(`<line x1='${padL}' y1='${Y(zeroLine).toFixed(1)}' x2='${width - padR}' y2='${Y(zeroLine).toFixed(1)}' stroke='#b45309' stroke-width='1.4' stroke-dasharray='2 4' opacity='0.8'></line>`);
+          parts.push(`<text x='${width - padR - 4}' y='${(Y(zeroLine) - 5).toFixed(1)}' text-anchor='end' font-size='10' font-weight='700' fill='#b45309' font-family='${FONT}'>área − círculo cero</text>`);
+        }
+        if (targetLine !== null) {
+          parts.push(`<line x1='${padL}' y1='${Y(targetLine).toFixed(1)}' x2='${width - padR}' y2='${Y(targetLine).toFixed(1)}' stroke='#ef4444' stroke-width='1.4' stroke-dasharray='5 4' opacity='0.75'></line>`);
+        }
+        function polyline(samples, getY, color, widthPx, opacity) {
+          const sm = downsample(samples, 320);
+          const coords = sm.map(function (p) { return X(p.s * toU).toFixed(1) + ',' + Y(getY(p) * toU2).toFixed(1); }).join(' ');
+          parts.push(`<polyline points='${coords}' fill='none' stroke='${color}' stroke-width='${widthPx}' stroke-linejoin='round' stroke-linecap='round' opacity='${opacity}'></polyline>`);
+          const lastP = samples[samples.length - 1];
+          parts.push(`<circle cx='${X(lastP.s * toU).toFixed(1)}' cy='${Y(getY(lastP) * toU2).toFixed(1)}' r='3.6' fill='${color}' stroke='#ffffff' stroke-width='1.4'></circle>`);
+        }
+        polyline(state.samples, function (p) { return p.plan; }, COLORS.wheel, 2.4, 0.95);
+        polyline(state.samples, function (p) { return p.green; }, COLORS.curve, 2.6, 1);
+        parts.push(`</svg>`);
+        els.graphBox.innerHTML = parts.join('');
+
+        const orientation = state.area < 0 ? 'horaria' : 'antihoraria';
+        const head = closed
+          ? `Curva cerrada (${orientation}) · <strong>${polygonPoints().length}</strong> puntos · longitud <strong>${fmtU(state.length)}</strong> · L = <strong>${state.L / UNIT} u</strong>`
+          : `Curva abierta · <strong>${state.points.length}</strong> puntos · longitud <strong>${fmtU(state.length)}</strong> · L = <strong>${state.L / UNIT} u</strong>`;
+        let meta = head;
+        if (state.crossings > 0) meta += ` · <strong>${state.crossings}</strong> autointersección${state.crossings === 1 ? '' : 'es'}`;
+        if (m && !m.out) {
+          meta += ` · rodadura ρ = <strong>${fmtU(m.rho)}</strong> (${wheelTurns(m).toFixed(2)} vueltas)`;
+          if (isLinear()) meta += ` · carro entre a = ${(m.aMin / UNIT).toFixed(1)} u y ${(m.aMax / UNIT).toFixed(1)} u`;
+          else meta += ` · articulación giró ${((m.psi - m.psi0) * 180 / Math.PI).toFixed(0)}° alrededor del polo` + (closed && m.winding !== 0 ? ` · <strong>el polo queda dentro</strong>: círculo cero πR₀² = ${fmtU2(polarConstant())}` : '');
+        } else if (m && m.out) {
+          meta += isLinear() ? ' · <strong>fuera de alcance</strong>: el trazador salió de la banda 0 &lt; y ≤ L' : ' · <strong>fuera de alcance</strong>: el trazador se alejó del polo más de 2L';
+        }
+        els.graphMeta.innerHTML = meta + '.';
+      }
+
+
+      // ---------- paneles ----------
+      function renderStats() {
+        const closed = isClosed();
+        const hasTrace = state.points.length > 1;
+        const areaVal = closed ? state.area : state.green;
+        els.statArea.textContent = hasTrace ? fmtU2(Math.abs(areaVal)) : '—';
+        if (closed) {
+          if (state.crossings > 0) {
+            els.statAreaSub.textContent = 'área algebraica |½∮(x dy − y dx)|: cada región cuenta según su número de vueltas';
+          } else {
+            els.statAreaSub.textContent = state.area >= 0 ? '½∮(x dy − y dx) · recorrido antihorario' : '½∮(x dy − y dx) · recorrido horario · se muestra |A|';
+          }
+        } else {
+          els.statAreaSub.textContent = hasTrace ? 'área barrida desde el punto de partida (valor absoluto)' : '½∮(x dy − y dx)';
+        }
+        if (isPR() && hasTrace) els.statAreaSub.textContent += ' · ≈ ' + fmtMi2(Math.abs(areaVal)) + ' del mapa';
+        const m = mech();
+        const lr = liveReading();
+        const out = !!(m && m.out);
+        els.statLabel2.textContent = 'Lectura de la rueda';
+        els.statLabel3.textContent = 'Rodadura de la rueda';
+        els.statLabel4.textContent = isLinear() ? 'Alcance del brazo' : 'Polo y alcance';
+        els.statRead.textContent = out ? 'fuera' : (lr === null ? '—' : fmtU2(Math.abs(lr)));
+        if (closed && lr !== null) {
+          let sub = state.area < 0 ? '|L·ρ|' : 'L·ρ';
+          if (!isLinear() && m.winding !== 0) sub = `|L·ρ ${m.winding > 0 ? '+' : '−'} ${Math.abs(m.winding) > 1 ? Math.abs(m.winding) + '·' : ''}πR₀²| con L·ρ = ${fmtU2(state.L * m.rho)}, πR₀² = ${fmtU2(polarConstant())}`;
+          els.statReadSub.textContent = sub + ' · error ' + fmtPct(relErr(lr, referenceArea())) + (state.challengeMode ? ' frente al área real' : ' frente a Green');
+        } else if (out) {
+          els.statReadSub.textContent = isLinear() ? 'el trazador salió de la banda 0 < y ≤ L' : 'el trazador se alejó del polo más de 2L';
+        } else {
+          els.statReadSub.textContent = 'L·ρ, con ρ la rodadura acumulada';
+        }
+        if (isPR() && lr !== null && !out && state.points.length > 1) els.statReadSub.textContent += ' · ≈ ' + fmtMi2(Math.abs(lr));
+        els.statRho.textContent = (m && !m.out) ? fmtU(m.rho) : '—';
+        els.statRhoSub.textContent = m ? `${wheelTurns(m).toFixed(2)} vueltas · radio ${WHEEL_R / UNIT} u · eje paralelo al brazo` : 'ρ = ∮dP·n: solo cuenta el movimiento perpendicular al brazo';
+        if (isLinear()) {
+          els.statReach.textContent = m ? fmtU(m.hMax) : '—';
+          els.statReachSub.textContent = out ? `⚠ supera la banda: 0 < y ≤ L = ${state.L / UNIT} u` : `altura máxima sobre la guía · banda 0 < y ≤ ${state.L / UNIT} u`;
+        } else {
+          els.statReach.textContent = m ? fmtU(m.dMax) : '—';
+          let sub = `distancia máxima al polo · alcance 2L = ${2 * state.L / UNIT} u`;
+          if (out) sub = `⚠ supera el alcance 2L = ${2 * state.L / UNIT} u`;
+          else if (closed && m) sub += m.winding !== 0 ? ' · el polo queda dentro' : ' · el polo queda fuera';
+          els.statReachSub.textContent = sub;
+        }
+      }
+
+      function renderChallengePanel() {
+        if (!state.challengeMode || !state.target || state.target.kind === 'pr') {
+          els.challengePanel.style.display = 'none';
+          return;
+        }
+        els.challengePanel.style.display = 'block';
+        els.challengeText.innerHTML = `Rodea ${state.target.article} <strong>${state.target.name}</strong> siguiendo su contorno y vuelve al punto de partida. La rueda mide exactamente lo que encierra tu trazo: el reto es tu pulso.`;
+        els.challengeHint.innerHTML = `💡 Área real: <strong>${fmtU2(state.target.area)}</strong> · brazo L = ${state.L / UNIT} u` + (isLinear() ? ' · planímetro lineal' : ' · planímetro polar');
+        els.challengeGoalBoard.innerHTML = `<div class='mini-board-title'>Figura</div><div class='mini-board-wrap'>${miniTargetSVG(state.target)}</div>`;
+      }
+
+
+      function renderSuccess() {
+        els.success.classList.remove('gold', 'silver', 'bronze', 'fail', 'note');
+        if (!isClosed()) { els.success.style.display = 'none'; return; }
+        els.success.style.display = 'block';
+        const m = mech();
+        const lr = liveReading();
+        if (!m || m.out || lr === null) {
+          els.success.classList.add('fail');
+          els.successTitle.innerHTML = `<span class='cup-icon fail'>✕</span><span>Fuera del alcance del brazo</span>`;
+          els.successText.innerHTML = isLinear()
+            ? `El trazador subió a ${m ? fmtU(m.hMax) : '—'} sobre la guía y el brazo mide L = ${state.L / UNIT} u: el carro no puede seguirlo. El área por Green sigue siendo ${fmtU2(Math.abs(state.area))}. Elige un brazo más largo o dibuja más cerca de la guía.`
+            : `El trazador se alejó ${m ? fmtU(m.dMax) : '—'} del polo y los dos brazos estirados llegan a 2L = ${2 * state.L / UNIT} u. El área por Green sigue siendo ${fmtU2(Math.abs(state.area))}. Acerca la figura al polo, cambia la posición del polo o alarga el brazo.`;
+          return;
+        }
+        const turns = wheelTurns(m).toFixed(2);
+        const absA = fmtU2(Math.abs(state.area));
+        const absLr = fmtU2(Math.abs(lr));
+        const cwNote = state.area < 0 ? ' Recorriste la curva en sentido horario: la rueda giró al revés (ρ < 0) y el área se muestra en valor absoluto.' : '';
+        if (state.challengeMode && state.target) {
+          const pr = state.target.kind === 'pr';
+          const err = relErr(lr, state.target.area);
+          const e = err * 100;
+          const tier = pr ? (e <= 5 ? 'gold' : (e <= 10 ? 'silver' : 'bronze')) : (e <= 4 ? 'gold' : (e <= 9 ? 'silver' : 'bronze'));
+          const names = { gold: 'Copa de oro', silver: 'Copa de plata', bronze: 'Copa de bronce' };
+          els.success.classList.add(tier);
+          els.successTitle.innerHTML = `<span class='cup-icon ${tier}'>🏆</span><span>${pr ? 'Mediste a Puerto Rico' : 'Medición completada'} · ${names[tier]}</span>`;
+          let text = pr
+            ? `La rueda leyó <strong>${absLr}</strong> ≈ <strong>${fmtMi2(Math.abs(lr))}</strong> siguiendo la costa; la isla grande mide <strong>${fmtU2(state.target.area)}</strong> en el mapa = <strong>3,363 mi² (8,710 km²)</strong> reales: error ${fmtPct(err)}. El famoso rectángulo de 100 × 35 millas daría 3,500 mi², un 4 % de más: los entrantes de la costa se comen la diferencia.`
+            : `La rueda rodó ρ = <strong>${fmtU(m.rho)}</strong> (${turns} vueltas) y la lectura es <strong>${absLr}</strong>; la figura mide <strong>${fmtU2(state.target.area)}</strong>: error ${fmtPct(err)}. Tu trazo encierra ${absA} según Green, y la rueda coincide con eso: el único error es el pulso al seguir el contorno.`;
+          if (!isLinear() && m.winding !== 0) text += ` Como rodeaste el polo, a L·ρ = ${fmtU2(state.L * m.rho)} se le ${m.winding > 0 ? 'sumó' : 'restó'} el círculo cero.`;
+          if (state.crossings > 0) text += ` Tu trazo se cruzó ${state.crossings === 1 ? 'una vez' : state.crossings + ' veces'}: la rueda midió el área algebraica.`;
+          els.successText.innerHTML = text + cwNote;
+          return;
+        }
+        els.success.classList.add('note');
+        if (state.crossings > 0) {
+          els.successTitle.innerHTML = `<span class='cup-icon note'>✦</span><span>Curva con autointersecciones: área algebraica</span>`;
+          els.successText.innerHTML = `Tu curva se cruza a sí misma ${state.crossings === 1 ? 'una vez' : state.crossings + ' veces'} (marcas ámbar), así que ya no encierra una sola región: ½∮(x dy − y dx) = <strong>${absA}</strong> es el <strong>área algebraica</strong>, la suma de cada región multiplicada por su número de vueltas (las recorridas al revés restan; en una figura en ocho, los dos lóbulos se restan entre sí). La rueda mide exactamente eso: ${state.area < 0 ? '|L·ρ|' : 'L·ρ'}${!isLinear() && m.winding !== 0 ? ` más la corrección del círculo cero (${m.winding > 0 ? '+' : '−'}${Math.abs(m.winding) > 1 ? Math.abs(m.winding) + '·' : ''}πR₀²: la articulación rodeó el polo ${Math.abs(m.winding) === 1 ? 'una vez' : Math.abs(m.winding) + ' veces'})` : ''} = <strong>${absLr}</strong>, con ρ = ${fmtU(m.rho)} (${turns} vueltas). El teorema de Green sigue funcionando región por región.` + cwNote;
+          return;
+        }
+        els.successTitle.innerHTML = `<span class='cup-icon note'>✦</span><span>Lectura exacta: ${isLinear() ? 'L·ρ = A' : (m.winding !== 0 ? 'L·ρ + círculo cero = A' : 'L·ρ = A')}</span>`;
+        let text;
+        if (isLinear()) {
+          text = `La rueda rodó ρ = <strong>${fmtU(m.rho)}</strong> (${turns} vueltas de radio ${WHEEL_R / UNIT} u) y |L·ρ| = <strong>${absLr}</strong> coincide con el área <strong>${absA}</strong>. La rueda solo registra la componente del movimiento perpendicular al brazo, y eso es −∮y dx con y la altura del trazador sobre la guía: las franjas ámbar se restan de las verde azuladas y queda exactamente la región. El carro fue y volvió entre a = ${(m.aMin / UNIT).toFixed(2)} u y ${(m.aMax / UNIT).toFixed(2)} u sin encerrar área.`;
+        } else if (m.winding === 0) {
+          text = `La rueda rodó ρ = <strong>${fmtU(m.rho)}</strong> (${turns} vueltas de radio ${WHEEL_R / UNIT} u) y |L·ρ| = <strong>${absLr}</strong> coincide con el área <strong>${absA}</strong>. Visto desde el polo, la rueda va sumando ½r²dθ: los sectores verde azulados suman, los ámbar restan y queda exactamente la región. La articulación fue y volvió por su circunferencia sin rodear el polo, así que no aparece constante alguna: es el cálculo de Gatterdam (1981) con brazos iguales.`;
+        } else {
+          const w = Math.abs(m.winding);
+          text = `Tu curva rodea el polo: la articulación dio ${w} vuelta${w === 1 ? '' : 's'} completa${w === 1 ? '' : 's'} y la rueda marcó L·ρ = <strong>${fmtU2(state.L * m.rho)}</strong>. ${m.winding > 0 ? 'Sumando' : 'Restando'} el círculo cero ${w > 1 ? w + '·' : ''}π(L₁² + L² − 2Ls) = ${w > 1 ? w + '·' : ''}πR₀² = <strong>${fmtU2(w * polarConstant())}</strong> (R₀ = ${fmtU(zeroCircleRadius())}) queda <strong>${absLr}</strong> en valor absoluto, que coincide con el área: <strong>${absA}</strong>. Es la constante que traen los manuales de los planímetros polares: lo que la rueda deja de registrar cuando el brazo da la vuelta entera.`;
+        }
+        els.successText.innerHTML = text + cwNote;
+      }
+
+      function chip(color, text, dash) {
+        return dash
+          ? `<div class='legend-chip'><span class='legend-dash' style='border-color:${color};'></span>${text}</div>`
+          : `<div class='legend-chip'><span class='legend-dot' style='background:${color};'></span>${text}</div>`;
+      }
+      function renderLegends() {
+        if (isLinear()) {
+          els.legendBoard.innerHTML = chip('#7c3aed', 'tu curva') + chip('#0d9488', 'rueda y su rastro') + chip('rgba(13,148,136,0.45)', 'franjas que suman (−y dx, dx &lt; 0)') + chip('rgba(245,158,11,0.55)', 'franjas que restan (dx &gt; 0)') + chip('#475569', 'guía y carro') + chip('#0f172a', 'trazador y brazo') + chip('#ef4444', 'índice del dial');
+        } else {
+          els.legendBoard.innerHTML = chip('#7c3aed', 'tu curva') + chip('#0d9488', 'rueda y su rastro') + chip('rgba(13,148,136,0.45)', 'sectores que suman (½r²dθ, antihorario)') + chip('rgba(245,158,11,0.55)', 'sectores que restan (horario)') + chip('#b45309', 'polo') + chip('#475569', 'brazo polar y articulación') + chip('#0f172a', 'trazador y brazo') + chip('#ef4444', 'índice del dial');
+        }
+        els.legendGraph.innerHTML = chip('#7c3aed', '&oint; de Green (área barrida)') + chip('#0d9488', 'lectura de la rueda L·ρ') + chip('#7c3aed', 'área exacta', true) + chip('#b45309', 'área − círculo cero (polo dentro)', true) + chip('#ef4444', 'área real de la figura (reto)', true);
+      }
+      function renderPRPanel() {
+        if (!els.prToggle) return;
+        const t = prTarget();
+        const on = isPR();
+        els.prToggle.innerHTML = on ? '✕ Quitar el mapa' : '🗺️ Cargar el mapa de PR';
+        els.prToggle.classList.toggle('active', on);
+        els.prPanel.classList.toggle('pr-on', on);
+        els.prLegend.innerHTML = `Escala: <strong>1 u ≈ ${t.miPerU.toFixed(2)} mi ≈ ${(t.miPerU * 1.609344).toFixed(2)} km</strong> · la isla grande ocupa ${t.wU.toFixed(1)} × ${t.hU.toFixed(1)} u ≈ <strong>${Math.round(t.wU * t.miPerU)} × ${Math.round(t.hU * t.miPerU)} mi</strong> · el dicho <strong>«100 × 35»</strong> la haría un rectángulo de <strong>3,500 mi²</strong>, pero el área real de la isla continental es <strong>≈ 3,363 mi² = 8,710 km²</strong> (${fmtU2(t.area)} en la mesa): la costa recorta un 4 %.`;
+      }
+      function renderControls() {
+        els.instrumentSelect.value = state.instrument;
+        els.armSelect.value = String(state.L / UNIT);
+        els.poleSelect.value = state.poleKey;
+        els.poleSelect.disabled = isLinear();
+        els.poleBox.style.opacity = isLinear() ? '0.45' : '1';
+        els.challengeToggle.checked = state.challengeMode;
+      }
+
+      let renderQueued = false;
+      function scheduleRender() {
+        if (renderQueued) return;
+        renderQueued = true;
+        window.requestAnimationFrame(function () {
+          renderQueued = false;
+          renderAll();
+        });
+      }
+
+      function renderAll() {
+        renderControls();
+        renderPRPanel();
+        drawCanvas();
+        renderChart();
+        renderStats();
+        renderChallengePanel();
+        renderSuccess();
+        renderLegends();
+      }
+
+      // ---------- interacción ----------
+      const canvas = els.canvas;
+      canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      canvas.addEventListener('pointerdown', function (e) {
+        if (state.mode === 'closing') return;
+        e.preventDefault();
+        const P = eventToMath(e);
+        resetTrace(false);
+        state.mode = 'drawing';
+        state.pointerId = e.pointerId;
+        if (typeof canvas.setPointerCapture === 'function') {
+          try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* sin captura */ }
+        }
+        setMessage(isLinear()
+          ? 'Trazando… la rueda va sumando −y·dx; rodea la región sin salir de la banda y suelta al volver al inicio.'
+          : 'Trazando… la rueda va sumando ½r²dθ desde el polo; rodea la región sin alejarte más de 2L del polo y suelta al volver al inicio.');
+        addTracerPoint(P);
+        renderAll();
+      });
+      canvas.addEventListener('pointermove', function (e) {
+        if (state.mode !== 'drawing' || e.pointerId !== state.pointerId) return;
+        e.preventDefault();
+        const evs = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : [];
+        if (evs && evs.length) {
+          for (let i = 0; i < evs.length; i += 1) {
+            if (state.mode !== 'drawing') break;
+            addTracerPoint(eventToMath(evs[i]));
+          }
+        } else {
+          addTracerPoint(eventToMath(e));
+        }
+        scheduleRender();
+      });
+      function onPointerEnd(e) {
+        if (state.mode !== 'drawing' || e.pointerId !== state.pointerId) return;
+        e.preventDefault();
+        addTracerPoint(eventToMath(e));
+        finishStroke();
+      }
+      canvas.addEventListener('pointerup', onPointerEnd);
+      canvas.addEventListener('pointercancel', onPointerEnd);
+
+      function afterSettingChange() {
+        if (isPR()) {
+          ensurePRReach();
+          resetTrace(true);
+          renderAll();
+          return;
+        }
+        if (state.challengeMode) { newTarget(); return; }
+        resetTrace(true);
+        renderAll();
+      }
+      els.instrumentSelect.addEventListener('change', function () {
+        state.instrument = this.value === 'linear' ? 'linear' : 'polar';
+        afterSettingChange();
+      });
+      els.armSelect.addEventListener('change', function () {
+        state.L = parseFloat(this.value) * UNIT;
+        afterSettingChange();
+      });
+      els.poleSelect.addEventListener('change', function () {
+        const key = POLES[this.value] ? this.value : 'esquina';
+        state.poleKey = key;
+        state.pole = { x: POLES[key].x, y: POLES[key].y };
+        afterSettingChange();
+      });
+      els.challengeToggle.addEventListener('change', function () {
+        setChallenge(this.checked);
+      });
+      els.resetBtn.addEventListener('click', function () {
+        resetTrace(true);
+        renderAll();
+      });
+      els.newTargetBtn.addEventListener('click', function () {
+        if (!state.challengeMode) return;
+        newTarget();
+      });
+      els.prToggle.addEventListener('click', function () {
+        setPRMode(!isPR());
+      });
+
+      if (typeof window.ResizeObserver === 'function') {
+        new window.ResizeObserver(function () { resizeCanvas(); }).observe(els.canvasWrap);
+      } else {
+        window.addEventListener('resize', resizeCanvas);
+      }
+
+      resizeCanvas();
+      resetTrace(true);
+      renderAll();
+    });
+    "))
+  ),
+  tags$div(
+    id = "planimeter-app",
+    class = "app-shell",
+    tags$div(
+      class = "hero-card",
+      tags$div(class = "badge", HTML("&#10022; Planímetro polar de Amsler y planímetro lineal")),
+      tags$h1(class = "hero-title", "Planímetros de rueda y el Teorema de Green"),
+      tags$p(class = "hero-subtitle", "Dibuja una curva cerrada con el ratón o el dedo (puede cruzarse a sí misma) y mídela con una rueda integradora. En el planímetro polar, un brazo gira alrededor de un polo fijo y una articulación lo une al brazo trazador; en el lineal, el extremo del brazo es un carro que desliza por una guía recta. En los dos, una rueda montada a mitad del brazo trazador, con el eje paralelo al brazo, solo rueda cuando el movimiento es perpendicular al brazo y resbala en el resto. Al cerrar la curva, su rodadura ρ da el área exactamente: |L·ρ| = ½|∮(x dy − y dx)|. Si la curva se cruza a sí misma, esa integral es el área algebraica: cada región cuenta multiplicada por su número de vueltas. Es el teorema de Green convertido en mecanismo, como en la nota de Gatterdam (1981)."),
+      tags$div(
+        class = "stats-grid",
+        tags$div(class = "stat-card", tags$div(class = "stat-label", "Área exacta (Green)"), tags$div(id = "stat-area", class = "stat-value", "—"), tags$div(id = "stat-area-sub", class = "stat-subvalue", HTML("&frac12;&oint;(x dy &minus; y dx)"))),
+        tags$div(class = "stat-card", tags$div(id = "stat-label-2", class = "stat-label", "Lectura de la rueda"), tags$div(id = "stat-read", class = "stat-value", "—"), tags$div(id = "stat-read-sub", class = "stat-subvalue", "L·ρ, con ρ la rodadura acumulada")),
+        tags$div(class = "stat-card", tags$div(id = "stat-label-3", class = "stat-label", "Rodadura de la rueda"), tags$div(id = "stat-rho", class = "stat-value", "—"), tags$div(id = "stat-rho-sub", class = "stat-subvalue", "ρ = ∮dP·n: solo cuenta el movimiento perpendicular al brazo")),
+        tags$div(class = "stat-card", tags$div(id = "stat-label-4", class = "stat-label", "Polo y alcance"), tags$div(id = "stat-reach", class = "stat-value", "—"), tags$div(id = "stat-reach-sub", class = "stat-subvalue", "distancia máxima al polo · alcance 2L"))
+      )
+    ),
+    tags$div(style = "height: 16px;"),
+    tags$div(
+      class = "play-grid",
+      tags$div(
+        class = "board-card",
+        tags$div(
+          class = "section-head",
+          tags$div(class = "section-icon", HTML("&#9998;")),
+          tags$div(tags$h2(class = "section-title", "Mesa de dibujo"), tags$p(class = "section-subtitle", "Elige el instrumento, la longitud del brazo y, en el polar, dónde clavar el polo. Dibuja una región (o traza la figura del reto) sin salir del alcance sombreado y compara la integral de línea exacta con la lectura de la rueda. Los sectores o franjas de colores muestran cómo la rueda va sumando y restando; el dial de la esquina es la rueda vista de frente."))
+        ),
+        tags$div(
+          class = "controls-grid",
+          tags$div(class = "control-box", tags$label(class = "control-label", `for` = "instrument-select", "Instrumento"), tags$select(id = "instrument-select", class = "control-select", tags$option(value = "polar", "Polar de Amsler (polo fijo)", selected = "selected"), tags$option(value = "linear", "Lineal (carro en guía recta)"))),
+          tags$div(class = "control-box", tags$label(class = "control-label", `for` = "arm-select", "Longitud del brazo L"), tags$select(id = "arm-select", class = "control-select", tags$option(value = "3", "3 u (corto)"), tags$option(value = "5", "5 u"), tags$option(value = "7", "7 u", selected = "selected"), tags$option(value = "9", "9 u"), tags$option(value = "12", "12 u (largo)"))),
+          tags$div(id = "pole-box", class = "control-box", tags$label(class = "control-label", `for` = "pole-select", "Posición del polo"), tags$select(id = "pole-select", class = "control-select", tags$option(value = "esquina", "Esquina inferior izquierda", selected = "selected"), tags$option(value = "abajo", "Borde inferior, al centro"), tags$option(value = "centro", "Centro de la mesa (polo dentro)"))),
+          tags$div(class = "control-box switch-card", tags$div(class = "switch-row", tags$div(tags$div(class = "switch-label-text", "Modo reto"), tags$div(class = "switch-subtext", "Traza una figura de área conocida")), tags$label(class = "switch", tags$input(id = "challenge-toggle", type = "checkbox"), tags$span(class = "slider-switch")))),
+          tags$button(id = "reset-game", class = "control-button", HTML("&#8635; Reiniciar"))
+        ),
+        tags$div(
+          id = "challenge-panel",
+          class = "challenge-panel",
+          tags$div(class = "challenge-grid", tags$div(tags$h3(class = "challenge-title", "Reto activo: traza la figura"), tags$p(id = "challenge-text", class = "challenge-text"), tags$div(id = "challenge-hint", class = "challenge-hint"), tags$div(class = "challenge-actions", tags$button(id = "new-target", class = "control-button", "Nueva figura"))), tags$div(id = "challenge-goal-board"))
+        ),
+        tags$div(id = "canvas-wrap", class = "board-wrap", tags$canvas(id = "mesa-canvas", class = "mesa", width = "720", height = "480")),
+        tags$div(id = "legend-board", class = "legend-row"),
+        tags$div(
+          id = "pr-panel",
+          class = "pr-panel",
+          tags$div(
+            class = "pr-head",
+            tags$div(
+              tags$h3(class = "pr-title", "Reto: el mapa de Puerto Rico 🇵🇷"),
+              tags$p(class = "pr-text", "Carga el mapa (contornos del mapa municipal oficial) y sigue la costa de la isla grande con el trazador. Vieques, Culebra, Mona y los cayos no cuentan: el reto es solo la isla continental. Mona y Desecheo quedan fuera del encuadre, al oeste.")
+            ),
+            tags$button(id = "pr-toggle", class = "control-button", HTML("&#128506;&#65039; Cargar el mapa de PR"))
+          ),
+          tags$div(id = "pr-legend", class = "pr-legend")
+        ),
+        tags$div(id = "message-box", class = "message-box", "Planímetro polar: el polo está fijo, la articulación recorre la circunferencia de radio L alrededor del polo y la rueda va a mitad del brazo trazador. Dibuja una curva cerrada dentro del disco de alcance (radio 2L)."),
+        tags$div(id = "success-card", class = "success-card", style = "display:none;", tags$h3(id = "success-title", class = "success-title"), tags$p(id = "success-text", class = "success-text"))
+      ),
+      tags$div(
+        class = "graph-card",
+        tags$div(class = "section-head", tags$div(class = "section-icon", HTML("&#8747;")), tags$div(tags$h2(class = "section-title", "Integral de línea en vivo"), tags$p(class = "section-subtitle", "La curva violeta acumula ½∮(x−x₀)dy − (y−y₀)dx: el área barrida desde el punto de partida. La verde azulada es la lectura de la rueda L·ρ. Al cerrar la curva coinciden exactamente; si en el polar rodeas el polo, la rueda se queda corta justo en el área del círculo cero."))),
+        tags$div(
+          class = "graph-shell",
+          tags$div(id = "graph-meta", class = "graph-meta"),
+          tags$div(id = "graph-box", class = "graph-box"),
+          tags$div(id = "legend-graph", class = "legend-row"),
+          tags$div(
+            class = "formula-box",
+            tags$div(class = "formula-title", "Lo que mide la rueda"),
+            tags$p(class = "formula-line", "El brazo trazador va de A (carro o articulación) a T = A + L·u. La rueda está en P = A + s·u con el eje paralelo al brazo: registra solo la componente del movimiento perpendicular al brazo,"),
+            tags$div(class = "formula-math", HTML("d&rho; = dP&middot;n = dA&middot;n + s&thinsp;d&phi;")),
+            tags$p(class = "formula-line", "y el segmento AT barre un área dS = L·dA·n + ½L²·dφ. Para un ciclo cerrado del segmento, el área barrida es la que encierra T menos la que encierra A (teorema del segmento móvil, una integración por partes con Green)."),
+            tags$p(class = "formula-line", "Si la curva se cruza a sí misma, ½∮(x dy − y dx) es el área algebraica: cada región cuenta con su número de vueltas (recorrer al revés resta; una figura en ocho da la diferencia de sus lóbulos). La rueda mide eso mismo, y el área se reporta siempre en valor absoluto."),
+            tags$div(class = "formula-title", style = "margin-top:12px;", "Planímetro lineal: carro en una guía"),
+            tags$p(class = "formula-line", "Con A = (a, 0) en la guía e y = L·sen φ la altura del trazador, dρ = −(y/L)dx + (diferencial exacta), y al cerrar"),
+            tags$div(class = "formula-math", HTML("A = &minus;&oint; y&thinsp;dx = L&middot;&rho;")),
+            tags$p(class = "formula-line", "exactamente: las franjas verticales entre la curva y la guía se suman al ir hacia un lado y se restan al volver."),
+            tags$div(class = "formula-title", style = "margin-top:12px;", "Planímetro polar de Amsler"),
+            tags$p(class = "formula-line", "Con el polo O fijo, A recorre la circunferencia de radio L₁ alrededor de O. Tomando coordenadas polares (r, θ) del trazador respecto al polo, L·dρ = ½r²dθ + (diferencial exacta) + (términos en dψ y dφ que se anulan al cerrar si el polo queda fuera):"),
+            tags$div(class = "formula-math", HTML("A = &frac12;&oint; r&sup2;&thinsp;d&theta; = L&middot;&rho;")),
+            tags$p(class = "formula-line", "Es el cálculo de Gatterdam (1981) con brazos iguales L₁ = L; la posición s de la rueda no importa. Si la curva rodea el polo, la articulación da una vuelta entera y los términos angulares aportan una constante, el círculo cero:"),
+            tags$div(class = "formula-math", HTML("A = L&middot;&rho; + &pi;(L&#8321;&sup2; + L&sup2; &minus; 2Ls) = L&middot;&rho; + &pi;R&#8320;&sup2;")),
+            tags$p(class = "formula-line", "Con brazos iguales y la rueda a mitad del brazo, R₀ = L: el círculo cero coincide con la circunferencia que recorre la articulación. Si el trazador la recorre, la rueda no gira nada.")
+          )
+        )
+      )
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  # La lógica vive en JavaScript para mantener la app fluida en shinyapps.io.
+}
+
+shinyApp(ui, server)
